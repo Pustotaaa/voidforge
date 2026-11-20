@@ -51,22 +51,18 @@ async function createProfile(db,input) {
  await query(db,'INSERT INTO pilot_profiles (id,recovery_hash,name,ship) VALUES(?,?,?,?)',id,recoveryHash,name,JSON.stringify(ship)).run();
  return payload({id,name,ship,room:null,lease:null,secret},201);
 }
-async function authorize(db,request) {
+async function authorize(db,request,full=true) {
  const header=request.headers.get('authorization')||'';
  const secret=header.startsWith('Bearer ')?header.slice(7):'';
  if (!SECRET_PATTERN.test(secret)) reject(401,'Откройте профиль пилота.');
- const profile=await query(db,'SELECT * FROM pilot_profiles WHERE recovery_hash=?',await fingerprint(secret)).first();
+ const profile=await query(db,full?'SELECT * FROM pilot_profiles WHERE recovery_hash=?':'SELECT id FROM pilot_profiles WHERE recovery_hash=?',await fingerprint(secret)).first();
  if (!profile) reject(401,'Ключ восстановления не найден.');
  return profile;
 }
 async function loadRoom(db,code,now) {
- const row=await query(db,'SELECT revision,state FROM flight_rooms WHERE code=? AND expires_at>?',code,now).first();
+ const row=await query(db,'SELECT revision,state,(SELECT json_group_object(id,lease) FROM pilot_profiles WHERE room_code=flight_rooms.code) AS leases FROM flight_rooms WHERE code=? AND expires_at>?',code,now).first();
  if (!row) reject(404,'Комната не найдена или уже закрылась.');
- return {revision:row.revision,state:JSON.parse(row.state)};
-}
-async function activeLeases(db,code) {
- const result=await query(db,'SELECT id, lease FROM pilot_profiles WHERE room_code=?',code).all();
- return new Map(result.results.map(player=>[player.id,player.lease]));
+ return {revision:row.revision,state:JSON.parse(row.state),leases:new Map(Object.entries(JSON.parse(row.leases||'{}')))};
 }
 function keepPilots(world, leases, now) {
  world.players=world.players.filter(player=>leases.get(player.id)===player.lease&&now-player.seen<=PLAYER_IDLE_MS);
@@ -79,16 +75,31 @@ function actorView(pilot, now) {
  return {id,name,slot,online:now-seen<=10_000,x:ship.x,y:ship.y,vx:ship.vx,vy:ship.vy,angle:ship.angle,
   angularVelocity:ship.angularVelocity,modules:ship.modules,dead:ship.dead,shield:ship.systems.shield,mined:ship.mined};
 }
-function view(code,player,world,now) {
+function publicEnemy(enemy) {
+ const {id,name,archetype,x,y,vx,vy,angle,angularVelocity,modules,dead,hullCapacity}=enemy;
+ return {id,name,archetype,x,y,vx,vy,angle,angularVelocity,modules,dead,hullCapacity};
+}
+function view(code,player,world,now,input=null,busy=worldNeedsStep(world,now)) {
  const ship=player.ship;
- return {
+ const data={
   code,you:player.id,lease:player.lease,inputSeq:player.inputSeq,time:world.time,goal:ROOM_GOAL,total:stockSize(world.stock),cargo:world.stock,
   players:world.players.map(pilot=>actorView(pilot,now)),
   ship,hold:usedCargo(ship),maxHold:capacityOf(ship),docked:canDock(ship),target:player.target,
-  course:player.course,aim:player.aim,dashCooldown:player.dashCooldown,cruise:player.cruise,
+  course:player.course,aim:player.aim,dashCooldown:player.dashCooldown,dashing:Boolean(player.dash),cruise:player.cruise,
+  tick:world.lastTick,busy,rockVersion:world.rockVersion??1,
   cargoItems:CARGO_ITEMS,places:DOCKS,rocks:world.rocks,enemies:world.enemies,fragments:world.fragments,shots:world.shots,
   events:world.events,actions:player.handled.slice(-12),feedback:player.feedback,
  };
+ if(input?.wire!==3)return data;
+ if(input.cached===true){delete data.places;delete data.cargoItems;}
+ if(input.cached===true&&input.rockVersion===data.rockVersion)delete data.rocks;
+ data.enemies=world.enemies.map(publicEnemy);
+ data.events=world.events.filter(event=>event.id>(Number.isSafeInteger(input.afterEvent)?input.afterEvent:0));
+ if(Array.isArray(input.actions)&&input.actions.length){
+  const ids=new Set(input.actions.slice(0,8).map(action=>action?.id));
+  data.actions=player.handled.filter(action=>ids.has(action.id));
+ }else data.actions=[];
+ return data;
 }
 const newRoomCode = () => Array.from(randomBytes(6),byte=>ROOM_CHARS[byte&31]).join('');
 async function enterRoom(db,id,code,creating) {
@@ -98,7 +109,7 @@ async function enterRoom(db,id,code,creating) {
   const picked=isNew?{state:makeRoom(now)}:await loadRoom(db,roomCode,now);
   const world=picked.state;
   if (!isNew) {
-   keepPilots(world,await activeLeases(db,roomCode),now);
+   keepPilots(world,picked.leases,now);
    stepRoom(world,now);
    world.players=world.players.filter(player=>player.id!==id);
   }
@@ -118,12 +129,19 @@ async function enterRoom(db,id,code,creating) {
  }
  reject(503,'Комната обновляется. Попробуйте ещё раз.');
 }
-function takeInput(player,input,now) {
- if (!Number.isSafeInteger(input.seq)||input.seq<=player.inputSeq) return;
+function readControls(input) {
  const value=n=>typeof n==='number'&&Number.isFinite(n)?bound(n,-1,1):0;
  const rawX=value(input.x),rawY=value(input.y), norm=Math.max(1,Math.hypot(rawX,rawY));
  const heading=typeof input.heading==='number'&&Number.isFinite(input.heading)?Math.atan2(Math.sin(input.heading),Math.cos(input.heading)):null;
- player.input={x:rawX/norm,y:rawY/norm,heading,fire:input.fire===true};
+ return {x:rawX/norm,y:rawY/norm,heading,fire:input.fire===true};
+}
+function controlsChanged(a,b) {
+ return Math.hypot(a.x-b.x,a.y-b.y)>.018||a.fire!==b.fire||
+  (a.heading!==b.heading&&(a.heading===null||b.heading===null||Math.abs(FlightCore.bearingDifference(a.heading,b.heading))>.032));
+}
+function takeInput(player,input,control,now) {
+ if(!Number.isSafeInteger(input.seq)||input.seq<=player.inputSeq)return;
+ player.input=control;
  player.inputSeq=input.seq;
  player.seen=now;
 }
@@ -274,16 +292,25 @@ async function syncRoom(db,id,code,input,leaving) {
  for (let attempt=0;attempt<9;attempt++) {
   const now=Date.now();
   const picked=await loadRoom(db,code,now), world=picked.state;
-  const leases=await activeLeases(db,code);
-  keepPilots(world,leases,now);
+  keepPilots(world,picked.leases,now);
   const player=world.players.find(player=>player.id===id&&player.lease===input.lease);
   if (!player) reject(409,'Сеанс комнаты завершён. Войдите снова, корабль сохранён.');
-  stepRoom(world,now);
+  const control=readControls(input);
+  const busy=worldNeedsStep(world,now), age=now-player.seen;
+  const hasAction=Array.isArray(input.actions)&&input.actions.length>0;
+  const changed=Number.isSafeInteger(input.seq)&&input.seq>player.inputSeq&&controlsChanged(control,player.input);
+  const modern=input.wire===3&&!leaving;
+  // Fast replies neither advance the simulation nor rewrite the same room from several peers.
+  if(modern&&!hasAction&&!changed&&(!busy&&age<5800||busy&&now-world.lastTick<125&&age<550)){
+   return payload(view(code,player,world,now,input,busy));
+  }
+  if(!modern||busy)stepRoom(world,now);
+  else {world.lastTick=Math.max(world.lastTick,now);world.tickDebt=0;}
   const batch=[];
   const writeId=crypto.randomUUID();
   if (leaving) world.players=world.players.filter(member=>member!==player);
   else {
-   takeInput(player,input,now);
+   takeInput(player,input,control,now);
    applyActions(world,player,input.actions);
   }
   // The lease check and room revision are evaluated in the same write as the simulation.
@@ -293,7 +320,7 @@ async function syncRoom(db,id,code,input,leaving) {
    JSON.stringify(player.ship),id,code,input.lease,code,writeId));
   const [written]=await db.batch(batch);
   // Profile updates from the trigger may also count as changed rows in D1.
-  if (written.meta.changes>0) return payload(leaving?{left:true}:view(code,player,world,now));
+  if (written.meta.changes>0) return payload(leaving?{left:true}:view(code,player,world,now,input));
  }
  reject(503,'Комната обновляется. Повторяем запрос.');
 }
@@ -308,7 +335,7 @@ async function route(request,env,path) {
  if (path==='/api/v2/profile'&&request.method==='GET') return payload(profileView(await authorize(db,request)));
  if (request.method!=='POST') reject(405,'Метод не поддерживается.');
  if (path==='/api/v2/profile') return createProfile(db,await readInput(request));
- const profile=await authorize(db,request);
+ const profile=await authorize(db,request,false);
  const input=await readInput(request);
  if (path==='/api/v2/rooms') {
   await query(db,'DELETE FROM flight_rooms WHERE code IN (SELECT code FROM flight_rooms WHERE expires_at<=? LIMIT 20)',Date.now()).run();

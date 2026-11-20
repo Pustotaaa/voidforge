@@ -15,7 +15,8 @@ sharedFlight = (() => {
  let lobby=null, room=null, world=null, profile=null, secret=null;
  let pointer=null, firePointer=null, touchHeading=null, pending=false, syncing=false, timer;
  let lastFrame=null, snapshotAt=0, lastEvent=0, noticeUntil=0, inputSeq=0, sentActions=[];
- let retryCount=0, dockKey='';
+ let retryCount=0,dockKey='',wakePending=false,aimWake=-Infinity;
+ let link=CoopNet.newLink(), flightPhysics=null;
 
  function read(storage,key) {
   try {return globalThis[storage].getItem(key);} catch {return null;}
@@ -156,7 +157,8 @@ sharedFlight = (() => {
  function showFlight(data) {
   room={code:data.code,lease:data.lease};
   write('sessionStorage',roomKey,data.code);
-  inputSeq=data.inputSeq;retryCount=0;sentActions=[];world=null;
+  inputSeq=data.inputSeq;retryCount=0;sentActions=[];world=null;wakePending=false;
+  link=CoopNet.newLink();
   effects.length=0;visibleShips.clear();lastFrame=null;clearInput();
   lastEvent=data.events.at(-1)?.id||0;
   camera.x=data.ship.x;camera.y=data.ship.y;roomCameraScale=cameraScale;
@@ -212,7 +214,10 @@ sharedFlight = (() => {
   stick.id=null;stick.x=stick.y=0;
   $('coopStickKnob').style.transform='translate(0,0)';
  }
- function later(delay) {clearTimeout(timer);timer=setTimeout(sync,delay);}
+ function later(delay) {
+  if(delay===0&&syncing){wakePending=true;return;}
+  clearTimeout(timer);timer=setTimeout(sync,delay);
+ }
  function selectedCourse() {return world?.target||world?.course;}
  function command(type,parameters={}) {
   if(!room)return;
@@ -236,32 +241,41 @@ sharedFlight = (() => {
  async function sync() {
   if(!room||syncing)return;
   const active=room;
-  syncing=true;
+  syncing=true;wakePending=false;
   const started=performance.now();
+  const input=intent();
+  if(input.heading!==null)input.heading=Math.round(input.heading*64)/64;
   try {
-   const data=await request(roomPath(active.code,'sync'),{lease:active.lease,seq:++inputSeq,...intent(),actions:sentActions.slice(0,8)});
+   const data=await request(roomPath(active.code,'sync'),{lease:active.lease,seq:++inputSeq,...input,
+    actions:sentActions.slice(0,8),wire:3,cached:true,rockVersion:world.rockVersion,afterEvent:lastEvent});
    if(room!==active)return;
    retryCount=0;
-   setText('coopConnection','В сети');
-   absorb(data);
+   absorb(data,performance.now()-started);
+   const ping=link.ping();
+   setText('coopConnection',ping===null?'В сети':'В сети · '+ping+' мс');
   } catch(error) {
    if(room!==active)return;
    if([401,404,409].includes(error.status)){showLobby(error.message);return;}
    setText('coopConnection','Переподключение');
-   retryCount=Math.min(4,retryCount+1);
+   retryCount=Math.min(5,retryCount+1);
   } finally {
    syncing=false;
    if(room){
-    const input=intent(), busy=input.x||input.y||input.fire||selectedCourse()||sentActions.length||world?.shots.length;
-    const delay=retryCount?Math.min(2400,retryCount*450):busy?230:500;
-    later(Math.max(50,delay-(performance.now()-started)));
+    const held=intent(),busy=held.x||held.y||held.fire||selectedCourse()||sentActions.length||world?.busy;
+    const delay=link.cadence(busy,document.hidden,retryCount,wakePending);
+    wakePending=false;
+    later(Math.max(30,delay-(performance.now()-started)));
    }
   }
  }
- function absorb(data) {
+ function absorb(data,latency) {
   const prior=world;
-  world=data;snapshotAt=performance.now();
+  world=data={...prior,...data};
+  snapshotAt=performance.now();
   if(profile)profile.ship=data.ship;
+  const cargoMass=Object.entries(GOODS).reduce((sum,[key,item])=>sum+((data.ship.cargo[key]??data.ship.systems[key])||0)*item.mass,0);
+  flightPhysics=FlightCore.shipPhysics(data.ship,types,cargoMass,data.ship.systems.power);
+  link.receive(data,snapshotAt,latency,flightPhysics);
   setText('coopCount',data.players.filter(player=>player.online).length+' / 5');
   const roster=players=>JSON.stringify(players.map(player=>[player.id,player.online,player.dead,player.mined]));
   if(!prior||roster(prior.players)!==roster(data.players)){
@@ -392,7 +406,10 @@ sharedFlight = (() => {
  function pointerMove(event) {
   if(!world||!$('coopServices').hidden)return;
   if(event.pointerType==='mouse'||event.pointerType===undefined){
+   const moved=!mouse.seen||Math.hypot(mouse.x-event.clientX,mouse.y-event.clientY)>8;
    Object.assign(mouse,{seen:true,x:event.clientX,y:event.clientY});touchHeading=null;
+   const now=performance.now();
+   if(moved&&now-aimWake>150){aimWake=now;later(0);}
    return;
   }
   if(pointer?.id!==event.pointerId||pointer.x<W/2)return;
@@ -500,7 +517,7 @@ sharedFlight = (() => {
    $(id).onclick=()=>command('replace',{item});
   }
   bindTouch();
-  document.addEventListener('visibilitychange',()=>{if(document.hidden&&room){clearInput();later(0);}});
+  document.addEventListener('visibilitychange',()=>{if(room){if(document.hidden)clearInput();later(0);}});
   const inviteCode=new URL(location.href).searchParams.get('room')?.toUpperCase();
   const saved=read('sessionStorage',roomKey);
   if(codePattern.test(inviteCode||''))openLobby(inviteCode,saved===inviteCode);
@@ -511,16 +528,20 @@ sharedFlight = (() => {
   const blend=lastFrame===null?1:1-Math.exp(-elapsed*.016);
   roomCameraScale=smoothCameraZoom(roomCameraScale,cameraScale,elapsed/1000);
   lastFrame=now;
-  const lag=clamp((now-snapshotAt)/1000,0,.27), size=scale();
+  const lag=clamp((now-snapshotAt)/1000,0,.20), size=scale();
+  const sample=link.remoteAt(now), predicted=link.local(world,intent(),now,flightPhysics);
+  const targets=new Set();
   for(const pilot of world.players){
+   targets.add(pilot.id);
    const ship=visibleShips.get(pilot.id)||{x:pilot.x,y:pilot.y,angle:pilot.angle};
-   ship.x+=(pilot.x+pilot.vx*lag-ship.x)*blend;
-   ship.y+=(pilot.y+pilot.vy*lag-ship.y)*blend;
-   ship.angle+=angleDifference(pilot.angle+pilot.angularVelocity*lag,ship.angle)*blend;
+   const own=pilot.id===world.you, next=own&&predicted?predicted:sample(pilot), smoothing=own&&predicted?1:blend;
+   ship.x+=(next.x-ship.x)*smoothing;
+   ship.y+=(next.y-ship.y)*smoothing;
+   ship.angle+=angleDifference(next.angle,ship.angle)*smoothing;
    visibleShips.set(pilot.id,ship);
    if(pilot.id===world.you){camera.x+=(ship.x-camera.x)*blend;camera.y+=(ship.y-camera.y)*blend;}
   }
-  for(const id of visibleShips.keys())if(!world.players.some(pilot=>pilot.id===id))visibleShips.delete(id);
+  for(const id of visibleShips.keys())if(!targets.has(id))visibleShips.delete(id);
   shadeSpace(camera,camera);
   ctx.save();ctx.translate(W/2,H/2);ctx.scale(size,size);ctx.translate(-camera.x,-camera.y);
   const visible=point=>Math.abs(point.x-camera.x)<W/size/2+150&&Math.abs(point.y-camera.y)<H/size/2+150;
@@ -540,12 +561,13 @@ sharedFlight = (() => {
    }
   }
   for(const enemy of world.enemies){
-   if(!enemy.dead&&visible(enemy))drawShip(enemy);
+   const pose=sample(enemy);
+   if(!enemy.dead&&visible(pose))drawShip({...enemy,...pose});
   }
   if(world.aim){
    const marked=world.enemies.find(enemy=>enemy.id===world.aim.id&&!enemy.dead);
    if(marked){
-    const point=position(marked,world.aim);
+    const point=position({...marked,...sample(marked)},world.aim);
     ctx.strokeStyle='#fff';ctx.setLineDash([3,5]);ctx.strokeRect(point.x-14,point.y-14,28,28);ctx.setLineDash([]);
    }
   }

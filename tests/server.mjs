@@ -163,3 +163,73 @@ test('gameplay updates the shared battle, conserves cargo, and saves the pilot t
   sqlite.close();
  }
 });
+
+test('slow polling stays playable and idle rooms avoid repeat writes and static downloads',async()=>{
+ const {db,sqlite}=database();
+ sqlite.exec(await readFile(new URL('../drizzle/0000_flight.sql',import.meta.url),'utf8'));
+ const original=Date.now;
+ let now=400_000;
+ Date.now=()=>now;
+ try {
+  const pilot=(await call(db,'POST','/profile',null,{name:'Пинг'})).data;
+  const room=(await call(db,'POST','/rooms',pilot.secret,{})).data;
+  assert.equal(room.busy,false);
+  const baseline=sqlite.prepare('SELECT revision FROM flight_rooms WHERE code=?');
+  const startRevision=baseline.get(room.code).revision;
+  const route='/rooms/'+room.code+'/sync';
+  let seq=0, initialSize=0, deltaSize=0;
+  async function sync(input={}) {
+   const packet=await call(db,'POST',route,pilot.secret,{wire:3,lease:room.lease,seq:++seq,cached:true,
+    rockVersion:room.rockVersion,afterEvent:0,...input});
+   assert.equal(packet.status,200);
+   return packet.data;
+  }
+  for(let i=0;i<6;i++){
+   now+=500;
+   const view=await sync();
+   assert.equal(view.busy,false);
+   assert.equal(view.inputSeq,0);
+   assert.equal(Object.hasOwn(view,'rocks'),false);
+   assert.equal(Object.hasOwn(view,'places'),false);
+   deltaSize=Buffer.byteLength(JSON.stringify(view));
+  }
+  assert.equal(baseline.get(room.code).revision,startRevision);
+  initialSize=Buffer.byteLength(JSON.stringify(room));
+  assert.ok(deltaSize<initialSize*.55,{initialSize,deltaSize});
+  console.log('Co-op idle payload',initialSize,'→',deltaSize,'bytes; room writes during six idle polls: 0');
+
+  const resent=await sync({cached:false,rockVersion:0});
+  assert.deepEqual(resent.rocks,room.rocks);
+  assert.deepEqual(resent.places,room.places);
+  const scene=JSON.parse(sqlite.prepare('SELECT state FROM flight_rooms WHERE code=?').get(room.code).state);
+  scene.rocks=[];scene.enemies=[];scene.rockVersion++;
+  sqlite.prepare('UPDATE flight_rooms SET state=? WHERE code=?').run(JSON.stringify(scene),room.code);
+  const push=await sync({y:-1,heading:0});
+  assert.deepEqual(push.rocks,[]);
+  assert.ok(push.busy);
+  const shipY=push.ship.y;
+  let view=push;
+  for(const lag of [500,640,500,780,480,500]){
+   now+=lag;
+   view=await sync({y:-1,heading:0});
+   assert.ok(view.busy);
+   assert.ok(view.tick>push.tick);
+  }
+  assert.ok(view.ship.y<shipY-250,'ship advances through delayed input');
+  const released=await sync({heading:0});
+  let settled=released;
+  for(let i=0;i<10;i++){
+   now+=500;
+   settled=await sync({heading:0});
+  }
+  assert.ok(Math.abs(settled.ship.vy)<.25);
+  const solo=structuredClone(released.ship);
+  const cargo=Object.entries(CATALOG.goods).reduce((n,[key,item])=>n+((solo.cargo[key]??solo.systems[key])||0)*item.mass,0);
+  const phys=FlightCore.shipPhysics(solo,CATALOG.types,cargo,solo.systems.power);
+  for(let i=0;i<300;i++){
+   FlightCore.applyManualFlight(solo,{x:0,y:0},0,true,phys,FlightCore.speedLimit(phys),FlightCore.STEP);
+   FlightCore.integrate(solo,FlightCore.STEP);
+  }
+  assert.ok(Math.abs(settled.ship.y-solo.y)<.3);
+ } finally {Date.now=original;sqlite.close();}
+});

@@ -3,7 +3,8 @@ const DOCKS = CATALOG.places.filter(place => place.kind === 'station');
 const OBSTACLES = DOCKS.map(place => ({...place, r: 65}));
 const MAX_ROOM_PLAYERS = 5;
 const PLAYER_IDLE_MS = 45_000;
-const INPUT_IDLE_MS = 850;
+const INPUT_IDLE_MS = 1750;
+const FIRE_IDLE_MS = 1050;
 const ROOM_GOAL = 90;
 const CARGO_ITEMS = Object.keys(CATALOG.goods).filter(item => CATALOG.goods[item].space > 0);
 const RESUPPLY = {shells: {amount: 30, credits: 45}, rockets: {amount: 3, credits: 25}};
@@ -41,7 +42,7 @@ function enemyShip(source) {
 function makeRoom(now) {
  return {
   time: 0, lastTick: now, tickDebt: 0, players: [], rocks: structuredClone(CATALOG.rocks),
-  enemies: CATALOG.enemies.map(enemyShip), fragments: [], shots: [], stock: emptyCargo(),
+  enemies: CATALOG.enemies.map(enemyShip), fragments: [], shots: [], stock: emptyCargo(), rockVersion: 1,
   events: [], serial: 0,
  };
 }
@@ -106,7 +107,7 @@ function damageInRoom(room, ship, module, damage, kind, owner) {
   emit(room,'destroy',{x:ship.x,y:ship.y,kind});
   if (!ship.cargo) {
    const rock = {id:'wreck-'+ship.id,x:ship.x,y:ship.y,r:ship.archetype==='boss'?43:28,ore:ship.archetype==='boss'?100:ship.archetype==='scout'?26:65,seed:3,wreck:true,material:'salvage'};
-   room.rocks.push(rock);
+   room.rocks.push(rock);markRockChange(room);
    const winner=room.players.find(player=>player.id===owner);
    if (winner) {
     winner.ship.credit += ship.archetype==='boss'?550:ship.archetype==='scout'?65:150;
@@ -178,7 +179,7 @@ function extract(room, player, rock) {
  ship.heat=Math.min(100,ship.heat+pulse.heat);
  const amount=unstable?rock.ore:pulse.amount;
  rock.initialReserve??=rock.reserve||rock.ore;
- rock.ore-=amount;
+ rock.ore-=amount;markRockChange(room);
  if (layer==='surface'&&rock.work) rock.work.surface=Math.max(0,rock.work.surface-amount);
  spawnFragments(room,rock,profile.item,amount,unstable?null:ship);
  player.mining=pulse.cooldown;
@@ -364,29 +365,56 @@ function projectiles(room, dt, pilots, rocks) {
  }
  room.shots=room.shots.filter(shot=>shot.life>0).slice(-160);
 }
+function markRockChange(room) { room.rockVersion=(room.rockVersion??1)+1; }
+function worldNeedsStep(room, now) {
+ if (room.shots.length || room.fragments.length) return true;
+ const pilots=room.players.filter(pilot=>!pilot.ship.dead&&now-pilot.seen<=PLAYER_IDLE_MS);
+ for(const pilot of pilots){
+  const ship=pilot.ship,input=pilot.input;
+  if(pilot.target||pilot.course||pilot.dash||pilot.dashCooldown>0||ship.heat>0||Math.hypot(ship.vx,ship.vy)>.08||
+   ship.modules.some(module=>module.cd>0||module.disabledFor>0))return true;
+  if(now-pilot.seen<=INPUT_IDLE_MS&&(input.x||input.y||input.fire||
+   input.heading!==null&&Math.abs(FlightCore.bearingDifference(input.heading,ship.angle))>.018))return true;
+  const region=regionOf(ship).id;
+  if(region==='rift'||region==='storm'||region==='nebula'||Math.abs(ship.angularVelocity)>.018)return true;
+  if(ship.energy<99.995||ship.systems.shield<installed(ship,'shield')*90&&region!=='nebula')return true;
+  if(!inSafeZone(ship)&&room.enemies.some(enemy=>!enemy.dead&&gap(ship,enemy)<1550))return true;
+ }
+ if(!pilots.length)return false;
+ return room.enemies.some(enemy=>!enemy.dead&&(gap(enemy,enemy.home)>18||Math.hypot(enemy.vx,enemy.vy)>.15))||
+  room.rocks.some(rock=>!rock.ore&&rock.renewAt!==undefined);
+}
 function stepRoom(room, now) {
- const elapsed = Math.max(0, Math.min(.6, (now-room.lastTick)/1000));
+ const elapsed=Math.max(0,Math.min(.88,(now-room.lastTick)/1000));
  room.lastTick=Math.max(now,room.lastTick);
  room.tickDebt+=elapsed;
  const pilots=room.players.filter(player=>now-player.seen<=PLAYER_IDLE_MS);
- if (!pilots.length){room.tickDebt=0;return;}
- for (const pilot of pilots) if (now-pilot.seen>INPUT_IDLE_MS) pilot.input=blankInput();
- while (room.tickDebt+1e-9>=STEP) {
+ if(!pilots.length){room.tickDebt=0;return;}
+ let rockVersion=-1, activeRocks, obstacles;
+ while(room.tickDebt+1e-9>=STEP){
   room.tickDebt-=STEP;
   room.time+=STEP;
-  const activeRocks=room.rocks.filter(rock=>rock.ore>0);
-  const obstacles=[...activeRocks,...OBSTACLES];
-  for (const pilot of pilots) if (!pilot.ship.dead) movePilot(room,pilot,STEP,obstacles);
+  const tickAt=now-room.tickDebt*1000;
+  if(rockVersion!==(room.rockVersion??1)){
+   rockVersion=room.rockVersion??1;
+   activeRocks=room.rocks.filter(rock=>rock.ore>0);
+   obstacles=[...activeRocks,...OBSTACLES];
+  }
+  for(const pilot of pilots){
+   if(tickAt-pilot.seen>INPUT_IDLE_MS)pilot.input=blankInput();
+   else if(tickAt-pilot.seen>FIRE_IDLE_MS)pilot.input.fire=false;
+   if(!pilot.ship.dead)movePilot(room,pilot,STEP,obstacles);
+  }
   const fighters=pilots.filter(player=>!player.ship.dead);
   updateHostiles(room,STEP,fighters);
-  projectiles(room,STEP,fighters,activeRocks);
-  updateFragments(room,STEP,fighters);
+  if(room.shots.length)projectiles(room,STEP,fighters,activeRocks);
+  if(room.fragments.length)updateFragments(room,STEP,fighters);
  }
- for (const rock of room.rocks) {
-  if (!rock.ore&&rock.renewAt<=room.time&&pilots.every(player=>gap(player.ship,rock)>850)) {
+ for(const rock of room.rocks){
+  if(!rock.ore&&rock.renewAt<=room.time&&pilots.every(player=>gap(player.ship,rock)>850)){
    rock.ore=rock.reserve;
-   if (rock.work)rock.work.surface=Math.ceil(rock.ore*.65);
-   delete rock.renewAt;
+   if(rock.work)rock.work.surface=Math.ceil(rock.ore*.65);
+   delete rock.renewAt;markRockChange(room);
   }
  }
 }
