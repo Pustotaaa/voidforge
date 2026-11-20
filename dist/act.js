@@ -538,13 +538,13 @@ function fogPattern(g) {
 
 const TROPHY_QUALITIES={hot:'Форсировка',light:'Облегчённая рама'};
 const trophyQuality=type=>WEAPONS[type]?'hot':type==='armor'?'light':undefined;
-const moduleMaxHp=m=>Math.round(types[m.type].hp*(m.quality==='light'?.8:1)*(m.mk===2?1.25:1)*(m.reinforced===true?1.5:1));
+const moduleMaxHp=m=>FlightCore.moduleHp(m,types);
 const moduleName=m=>types[m.type].name+(m.mk===2?' Mk II':'')+(TROPHY_QUALITIES[m.quality]?' · '+TROPHY_QUALITIES[m.quality]:'');
-const moduleMass=m=>(types[m.type].mass||8)*(m.quality==='light'?.72:1)*(m.mk===2?1.08:1);
+const moduleMass=m=>FlightCore.moduleMass(m,types);
 let upgradeTile=null;
 function upgradeQuote(m) {
  const value=types[m.type].cost;
- return {alloy:Math.max(16,Math.ceil(value*.65)),credits:35+Math.ceil(value*.56)};
+ return FlightCore.upgradeQuote(value);
 }
 function renderUpgrade() {
  const m=s.modules.find(m=>tileKey(m)===upgradeTile),control=$('upgradeModule');

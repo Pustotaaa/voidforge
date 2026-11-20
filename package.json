@@ -1,1 +1,12 @@
-{"name":"voidforge","version":"3.2.2","private":true,"scripts":{"test":"node tests/launch.cjs && node tests/game-smoke.cjs && node tests/act.cjs && node tests/balance.cjs && node tests/autopilot-playthrough.cjs && node tests/full-expedition.cjs && node tests/coop.cjs","playthrough":"node tests/autopilot-playthrough.cjs && node tests/full-expedition.cjs","check":"node --check dist/game.js && node --check dist/expedition.js && node --check dist/navigation.js && node --check dist/campaign.js && node --check dist/flight-services.js && node --check dist/industry.js && node --check dist/combat.js && node --check dist/act.js && node --check dist/sector-art.js && node --check dist/effects.js && node --check dist/presentation.js && node --check dist/launch.js && node --check dist/boot.js && node --check dist/coop.js"}}
+{
+  "name": "voidforge",
+  "version": "3.3.0",
+  "private": true,
+  "scripts": {
+    "test": "node tests/launch.cjs && node tests/game-smoke.cjs && node tests/act.cjs && node tests/balance.cjs && node tests/autopilot-playthrough.cjs && node tests/full-expedition.cjs && node tests/coop.cjs && npm run build && node --test tests/server.mjs",
+    "playthrough": "node tests/autopilot-playthrough.cjs && node tests/full-expedition.cjs",
+    "check": "node --check dist/game.js && node --check dist/expedition.js && node --check dist/navigation.js && node --check dist/campaign.js && node --check dist/flight-services.js && node --check dist/industry.js && node --check dist/combat.js && node --check dist/act.js && node --check dist/sector-art.js && node --check dist/effects.js && node --check dist/presentation.js && node --check dist/launch.js && node --check dist/boot.js && node --check dist/coop.js && node --check dist/flight-core.js && node --check server/simulation.mjs && node --check server/api.mjs",
+    "build": "node scripts/build-worker.mjs"
+  },
+  "type": "module"
+}

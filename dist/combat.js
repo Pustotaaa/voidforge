@@ -20,10 +20,10 @@ const WEAPONS={
 const GROUP_NAMES={all:'Всё',kinetic:'Кинетика',energy:'Энергия',rockets:'Ракеты'};
 const SALVAGE_SPACE=12;
 const tacticalPoint=(enemy,module)=>({...position(enemy,module),vx:enemy.vx,vy:enemy.vy,id:enemy.id});
-const operational=m=>!(m.disabledFor>0);
+const operational=FlightCore.operational;
 const activeCount=(type,ship=s)=>ship.modules.filter(m=>m.type===type&&operational(m)).length;
 const ammoCap=key=>AMMUNITION[key].baseCap+count('magazine')*AMMUNITION[key].perMagazine;
-const weaponGroup=weapon=>weapon.kind==='kinetic'?'kinetic':weapon.kind==='explosive'?'rockets':'energy';
+const weaponGroup=FlightCore.groupFor;
 
 Object.assign(GOODS,AMMUNITION);
 for(const [market,shellPrice,rocketPrice] of [['home',2,10],['forge',2,8],['atlas',3,12],['merchant',3,11]]) {
@@ -230,17 +230,7 @@ function runPointDefense(ship) {
   if(friendly)playSound('hit');
  }
 }
-function impactTime(from,to,center,radius) {
- const dx=to.x-from.x,dy=to.y-from.y,x=from.x-center.x,y=from.y-center.y;
- const c=x*x+y*y-radius*radius;
- if(c<=0)return 0;
- const a=dx*dx+dy*dy,projection=x*dx+y*dy;
- if(!a||projection>=0)return Infinity;
- const disc=projection*projection-a*c;
- if(disc<0)return Infinity;
- const time=(-projection-Math.sqrt(disc))/a;
- return time>=0&&time<=1?time:Infinity;
-}
+const impactTime=FlightCore.impactTime;
 function firstImpact(b,from,to) {
  let time=Infinity,collision=null;
  for(const a of s.asteroids) {
