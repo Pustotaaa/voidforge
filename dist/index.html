@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><meta name="description" content="VOIDFORGE — космическая стратегия в 1-bit. Постройте автономный корабль и освободите Чёрный сектор.">
+<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=27"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=1">
+</head>
+<body id="gameUi">
+<img id="sectorAtlas" src="art/sector-atlas.png" alt="" hidden><img id="lunarBackdrop" src="art/lunar-parallax.png" alt="" hidden>
+<canvas id="space" aria-label="Космос. Нажмите на астероид для добычи; удерживайте мышь для огня."></canvas>
+<div id="flightHud" aria-label="Управление полётом">
+  <header class="flightTop">
+    <div class="flightLeft">
+    <div class="flightInfo">
+      <div class="flightBrand"><i class="icon icon-ship" aria-hidden="true"></i> <strong>VOIDFORGE</strong> <span id="regionName">Причал</span></div>
+      <div class="flightVitals">
+        <div class="vital"><label for="hp">Корпус <b id="hpText"></b></label><progress id="hp" max="100"></progress></div>
+        <div class="vital"><label for="energy">Энергия <b id="energyText"></b></label><progress id="energy" max="100"></progress></div>
+        <div class="vital"><label for="heat">Нагрев <b id="heatText"></b></label><progress id="heat" max="100"></progress></div>
+        <div class="vital" id="shieldMeter" hidden><label for="shieldBar">Щит <b id="shieldText"></b></label><progress id="shieldBar" max="100"></progress></div>
+      </div>
+      <div class="damageHud">
+        <canvas id="damageMap" width="136" height="88" role="img" aria-label="Схема корпуса"></canvas>
+        <div><b>Модули</b><small id="damageStatus"></small>
+        <small id="ammoReadout"></small></div>
+      </div>
+    </div>
+    <div id="toast" aria-hidden="true"></div>
+    <div class="flightReports">
+      <button id="loanHud" type="button" hidden title="Проложить курс к рынку Причала"><i class="icon icon-cargo" aria-hidden="true"></i><span>Долг верфи<strong id="loanBalance"></strong></span></button>
+      <aside id="radioHud" class="radioHud" aria-live="polite" hidden><i id="radioPortrait" class="radioPortrait portrait-lia" aria-hidden="true"></i><div><b id="radioSpeaker"></b><span id="radioMessage"></span></div></aside>
+      <button id="objective" class="objectiveTile" hidden title="Открыть этап экспедиции"><i class="icon icon-journal" aria-hidden="true"></i><span id="objectiveText"></span></button>
+    </div>
+    </div>
+    <div class="flightRight">
+    <div class="flightUtility">
+      <button id="pause" class="utilityTile" aria-label="Пауза" title="Пауза [Пробел]"><i class="icon icon-pause" aria-hidden="true"></i></button>
+      <button id="help" class="utilityTile" aria-label="Справка" title="Справка"><i class="icon icon-help" aria-hidden="true"></i></button>
+      <button id="openCoop" class="utilityTile" type="button" aria-label="Кооператив" title="Кооператив"><i class="icon icon-station" aria-hidden="true"></i></button>
+      <button id="openMap" class="minimapTile" aria-label="Карта сектора" title="Карта [M]"><canvas id="map" width="190" height="180"></canvas><span><i class="icon icon-map" aria-hidden="true"></i><span class="mapTileLabel">Карта</span></span></button>
+    </div>
+      <div class="hudZoom" role="group" aria-label="Масштаб интерфейса">
+        <button id="uiSmaller" type="button" aria-label="Уменьшить интерфейс" title="Уменьшить интерфейс">−</button>
+        <button id="uiDefault" type="button" aria-label="Вернуть масштаб интерфейса к 100%" title="Вернуть 100%">100%</button>
+        <button id="uiLarger" type="button" aria-label="Увеличить интерфейс" title="Увеличить интерфейс">+</button>
+      </div>
+      <aside class="cargoHud" aria-label="Груз корабля">
+        <button id="holdHud" class="cargoHudHeader" type="button" aria-haspopup="dialog" title="Открыть полный инвентарь">
+          <i class="icon icon-cargo" aria-hidden="true"></i><span>Трюм</span><b id="holdCapacity"></b>
+        </button>
+        <div id="holdDetails" class="panelScroll" tabindex="0" role="region" aria-label="Ресурсы в трюме">
+          <ul id="holdResources" class="cargoManifest"></ul><p id="holdEmpty" hidden>Пусто</p>
+        </div>
+        <button id="holdToggle" class="cargoHudToggle" type="button" aria-expanded="true" aria-controls="holdDetails" aria-label="Свернуть список ресурсов"><i aria-hidden="true"></i></button>
+      </aside>
+      <div id="contactTarget" class="targetCard" hidden><div><b id="targetName"></b><small id="targetStatus"></small></div><canvas id="targetDiagram" width="150" height="94" aria-label="Схема цели. Нажмите на модуль, чтобы прицелиться"></canvas></div>
+      <div id="bossHud" class="bossPlate" hidden><div class="bossTitle"><b>Смотритель</b><span id="bossHealth"></span></div><progress id="bossBar" max="285"></progress><strong id="bossPhase"></strong></div>
+    </div>
+  </header>
+  <div class="flightDeck">
+    <div class="flightTouch">
+      <div id="joystick" role="group" aria-label="Тяга относительно носа корабля"><span class="joyAxis axisX"></span><span class="joyAxis axisY"></span><span id="joyKnob"></span><small>Тяга</small></div>
+      <button id="fire" aria-label="Удерживать для стрельбы"><i class="icon icon-target" aria-hidden="true"></i><span>Огонь</span></button>
+    </div>
+    <div class="flightControls">
+    <div class="flightActions">
+    <div class="flightQuick" aria-label="Действия в полёте">
+      <button id="weaponGroup" class="weaponGroupButton" type="button" title="Группа оружия · нажмите для смены"><i class="icon icon-target" aria-hidden="true"></i> <span id="weaponGroupLabel">Всё</span></button>
+      <button id="mine" aria-label="Добыча" title="Добыча [E]"><i class="icon icon-mine" aria-hidden="true"></i><span id="mineLabel">Добыча</span></button>
+      <button id="interact" class="primary" hidden title="Взаимодействовать [F]"><i class="icon icon-station" aria-hidden="true"></i><span id="interactLabel">Связь</span></button>
+    </div>
+    <div class="flightGadgets" aria-label="Манёвры и сканирование">
+      <span id="threatLevel" class="threatBadge">Угроза 0/5</span>
+      <button id="dash" type="button" aria-label="Рывок" title="Рывок [Shift]"><i class="icon icon-ion" aria-hidden="true"></i><span id="dashLabel">Рывок</span></button>
+      <button id="ping" type="button" aria-label="Импульс сканера" title="Импульс сканера [Q]"><i class="icon icon-science" aria-hidden="true"></i><span>Скан</span></button>
+      <button id="cruise" type="button" aria-pressed="false" title="Импульсный ход [V]"><i class="icon icon-engine" aria-hidden="true"></i><span>Разгон</span></button>
+      <button id="boon" type="button" hidden title="Протокол реликта [G]"><i class="icon icon-relic" aria-hidden="true"></i><span>Протокол</span></button>
+    </div>
+    </div>
+    <div class="flightMenu">
+    <div class="flightReadout"><span id="targetModuleLabel" hidden></span><span id="noAmmo" hidden>Нет боеприпасов</span><button id="miningHud" class="miningPlate" title="Настройки добычи" hidden><span id="miningTitle"></span><small id="miningLayer"></small></button><span id="modeLabel" hidden></span><span id="nearby" hidden></span></div>
+    <nav class="flightNav" aria-label="Меню игры">
+      <button id="build" title="Верфь [B]"><i class="icon icon-build" aria-hidden="true"></i><span>Верфь</span></button>
+      <button id="research" title="Наука [T]"><i class="icon icon-science" aria-hidden="true"></i><span>Наука</span></button>
+      <button id="journal" title="Журнал [J]"><i class="icon icon-journal" aria-hidden="true"></i><span>Журнал</span></button>
+      <button id="systems" title="Корабль [C]"><i class="icon icon-ship" aria-hidden="true"></i><span>Корабль</span></button>
+    </nav>
+    </div>
+    </div>
+  </div>
+</div><div id="bossIntro" class="bossIntro" hidden><span>ФЛАГМАН</span><strong>СМОТРИТЕЛЬ</strong></div><div id="saveState" aria-live="polite"></div><div id="toastStatus" class="screenReaderOnly" role="status"></div>
+<div class="overlay hidden" id="launchModal" role="dialog" aria-modal="true" aria-labelledby="launchTitle" aria-describedby="launchText">
+  <section class="launchPanel">
+    <div class="eyebrow" id="launchKicker"></div><h1 id="launchTitle" tabindex="-1"></h1>
+    <p id="launchText"></p><div class="launchActions"><button class="primary" type="button" id="launchAction"></button><button id="launchCoop" type="button" hidden>Кооператив</button></div>
+    <div class="starterGrid panelScroll" id="starterShips" hidden></div>
+    <p id="launchMarketHint" hidden>Добывайте ресурсы и продавайте их на рынке. Выручка автоматически идёт на погашение долга.</p>
+  </section>
+</div>
+<div class="overlay hidden" id="coopModal" role="dialog" aria-modal="true" aria-labelledby="coopTitle">
+  <section class="coopPanel">
+    <header class="modalHead">
+      <div><div class="eyebrow">Экипаж до пяти пилотов</div><h2 id="coopTitle">Кооператив</h2></div>
+      <button id="closeCoop" type="button">Назад</button>
+    </header>
+    <div class="panelScroll coopLobbyBody">
+      <p>Выйдите в общий сектор и наполните один трюм на весь экипаж.</p>
+      <p id="coopServer" class="coopMuted" role="status"></p>
+      <form id="coopForm">
+        <label for="coopName">Позывной</label>
+        <input id="coopName" autocomplete="nickname" maxlength="20" placeholder="Например, Игла">
+        <button id="coopCreate" type="button" class="primary">Создать комнату</button>
+        <div class="coopJoin">
+          <label for="coopCode">Код комнаты</label>
+          <input id="coopCode" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" placeholder="6 символов">
+          <button id="coopJoin" type="submit">Войти</button>
+        </div>
+        <p id="coopLobbyNote" role="status" hidden></p>
+      </form>
+    </div>
+  </section>
+</div>
+<section id="coopHud" aria-label="Сетевой вылет" hidden>
+  <header class="coopTop">
+    <div class="coopRoom">
+      <div><b>Общий сектор</b> <span id="coopConnection" class="coopMuted" role="status"></span></div>
+      <button id="coopInvite" type="button" aria-label="Скопировать приглашение">Код <b id="coopRoomCode"></b></button>
+    </div>
+    <button id="coopLeave" type="button">Выйти</button>
+  </header>
+  <aside class="coopRoster coopCard" aria-label="Экипаж">
+    <h2>Экипаж <span id="coopCount"></span></h2>
+    <ul id="coopPlayers"></ul>
+  </aside>
+  <aside class="coopCargo coopCard" aria-label="Общий трюм">
+    <h2>Общий трюм <span id="coopTotal"></span></h2>
+    <progress id="coopGoal" aria-label="Цель добычи"></progress>
+    <dl><div><dt>Руда</dt><dd id="coopIron">0</dd></div><div><dt>Кристаллы</dt><dd id="coopCrystal">0</dd></div><div><dt>Лёд</dt><dd id="coopIce">0</dd></div></dl>
+  </aside>
+  <div class="coopDpad" aria-label="Тяга">
+    <button data-coop-dir="ArrowUp" type="button" aria-label="Вверх">↑</button>
+    <button data-coop-dir="ArrowLeft" type="button" aria-label="Влево">←</button>
+    <button data-coop-dir="ArrowDown" type="button" aria-label="Вниз">↓</button>
+    <button data-coop-dir="ArrowRight" type="button" aria-label="Вправо">→</button>
+  </div>
+  <div class="coopControls"><p id="coopNotice" role="status" hidden></p><button id="coopMine" type="button" title="Добыча [E]">Добыча</button><span>WASD или стрелки · Клик по астероиду</span></div>
+</section>
+<div class="overlay hidden" id="builder" role="dialog" aria-modal="true" aria-labelledby="buildTitle"><section class="buildPanel"><div class="modalHead"><div><div class="eyebrow">ОРБИТАЛЬНАЯ ВЕРФЬ / ВРЕМЯ ОСТАНОВЛЕНО</div><h2 id="buildTitle">Конструктор корабля</h2></div><button id="closeBuild">Готово [B]</button></div><p class="buildIntro">Соединяйте модули с ядром. Разборка купленных модулей возвращает до 50% стоимости.</p><div class="buildToolbar"><button id="removeModule" aria-pressed="false">Установка</button><button id="undoBuild" disabled>Отменить</button><button id="upgradeModule" hidden>Mk II</button><span>СПЛАВ <b id="buildOre"></b></span></div><div class="buildLayout"><div class="buildPalette panelScroll"><div id="parts"></div><details class="trophyBay"><summary>Трофейные модули</summary><div id="spareModules"></div></details></div><div class="editorWrap"><canvas id="editor" width="540" height="440" aria-label="Редактор корабля: выберите клетку для установки модуля"></canvas><div id="buildStatus" role="status"></div></div><div class="buildInfo panelScroll"><h3 id="partName"></h3><p id="partDesc"></p><div id="shipStats"></div></div></div></section></div>
+<div class="overlay hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <section class="helpPanel">
+    <div class="eyebrow">Экспедиция «Порог»</div><h1 id="helpTitle">Первый полёт</h1>
+    <div class="helpTiles panelScroll">
+      <div><i class="icon icon-ship" aria-hidden="true"></i><p><b>Поверните корабль</b>Мышью или свайпом справа. W и джойстик вверх дают тягу по носу.</p></div>
+      <div><i class="icon icon-map" aria-hidden="true"></i><p><b>Выберите маршрут</b>Откройте карту или нажмите M. Касание пустого места задаёт курс.</p></div>
+      <div><i class="icon icon-mine" aria-hidden="true"></i><p><b>Соберите сплав</b>Нажмите на астероид или используйте E / +. Руда и лёд идут на переработку в порту. Рывок — Shift, сканер — Q, разгон — V. Эти действия есть и на панели полёта.</p></div>
+      <div><i class="icon icon-target" aria-hidden="true"></i><p><b>Держите цель перед носом</b>Автоприцел работает в секторе ±35°. Коснитесь вражеского модуля для приоритета. Нажимайте 1–4, чтобы сменить группу оружия. Боезапас пополняется на станции.</p></div>
+    </div>
+    <div class="dialogActions"><button id="closeHelp" class="primary">В полёт</button><button id="reset">Новый полёт</button></div>
+  </section>
+</div>
+<div class="overlay hidden" id="mapModal" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
+  <section class="mapPanel">
+    <div class="modalHead"><div><div class="eyebrow">Навигация</div><h2 id="mapTitle">Чёрный сектор</h2></div><button id="closeMap" title="Закрыть [M]">Закрыть</button></div>
+    <div class="mapLayout">
+      <div class="mapCanvasWrap"><canvas id="sectorMap" width="720" height="720" aria-label="Карта сектора. Нажмите на объект или точку маршрута."></canvas>
+        <div class="mapTools" aria-label="Масштаб карты"><button id="zoomOut" aria-label="Уменьшить масштаб">−</button><span id="zoomLabel">1×</span><button id="zoomIn" aria-label="Увеличить масштаб">+</button><button id="centerMap" aria-label="Показать корабль"><i class="icon icon-target" aria-hidden="true"></i></button><button id="resetMap">Весь мир</button></div>
+      </div>
+      <div class="mapSidebar panelScroll">
+        <div class="mapObject" id="mapObject" hidden><div class="mapObjectInfo"><div id="mapIcon"></div><div><h3 id="mapName"></h3><p id="mapMeta"></p></div></div><button id="mapAction" class="primary">Проложить курс</button></div>
+        <p id="routeInfo" class="mapHelp">Выберите объект или точку маршрута.</p>
+        <details class="mapIndex"><summary>Станции, руины и врата</summary><div id="mapDestinations"></div></details>
+        <div class="mapLegend"><i class="icon icon-station" aria-hidden="true"></i> Станция <i class="icon icon-relic" aria-hidden="true"></i> Руины <i class="icon icon-gate" aria-hidden="true"></i> Врата <i class="icon icon-enemy" aria-hidden="true"></i> Пират</div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="overlay hidden" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="resultTitle"><section class="resultPanel"><div class="eyebrow" id="resultEyebrow"></div><div class="resultGlyph" id="resultGlyph"></div><h1 id="resultTitle"></h1><p id="resultText"></p><div id="resultStats" class="panelScroll"></div><div class="dialogActions"><button id="resultContinue" class="primary"></button><button id="resultRestart">Новый полёт</button></div></section></div>
+<div class="overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><section class="confirmPanel"><div class="eyebrow">НОВЫЙ ПОЛЁТ</div><h2 id="confirmTitle">Начать с чистого листа?</h2><p>Текущий корабль и прогресс этого мира будут заменены. Сектор останется тем же.</p><div class="dialogActions"><button id="cancelReset" class="primary">Продолжить текущий</button><button id="confirmReset">Начать заново</button></div></section></div>
+<div class="overlay hidden" id="researchModal" role="dialog" aria-modal="true" aria-labelledby="researchTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">БОРТОВАЯ ЛАБОРАТОРИЯ</div><h2 id="researchTitle">Дерево исследований</h2></div><button id="closeResearch">Закрыть</button></div><div class="panelBalance" id="researchBalance"></div><div class="researchLayout"><div class="panelScroll"><div id="treeArea" class="treeArea"><canvas id="treeLinks" aria-hidden="true"></canvas><div id="techTree" class="techTree"></div></div></div><aside id="techDetail" class="techDetail panelScroll" aria-live="polite"></aside></div></section></div>
+<div class="overlay hidden" id="journalModal" role="dialog" aria-modal="true" aria-labelledby="journalTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">ЭКСПЕДИЦИЯ «ПОРОГ»</div><h2 id="journalTitle">Журнал капитана</h2></div><button id="closeJournal">Закрыть</button></div><div class="panelTabs"><button data-journal="mission" class="active">Экспедиция</button><button data-journal="contracts">Контракты</button><button data-journal="atlas">Атлас</button></div><div class="journalBody panelScroll"><div id="journalContent"></div><div class="journalExtras"><button id="target"><i class="icon icon-target" aria-hidden="true"></i> Отметить ближайшего пирата</button><details><summary>Последние события</summary><div id="log"></div></details></div></div></section></div>
+<div class="overlay hidden" id="cargoModal" role="dialog" aria-modal="true" aria-labelledby="cargoTitle">
+  <section class="cargoPanel">
+    <div class="modalHead"><h2 id="cargoTitle">Инвентарь</h2><button id="closeCargo" type="button">Закрыть</button></div>
+    <div class="cargoInventoryBody panelScroll" tabindex="0" role="region" aria-label="Содержимое инвентаря">
+      <div id="cargoInventoryBalance"></div>
+      <h3>Ресурсы и снабжение</h3><ul id="cargoInventoryGoods" class="cargoManifest"></ul>
+      <h3>Боезапас</h3><ul id="cargoInventoryAmmo" class="cargoManifest"></ul>
+      <h3>Трофеи</h3><ul id="cargoInventoryTrophies" class="cargoManifest"></ul>
+      <p id="cargoInventoryEmpty">Трофеев пока нет</p>
+    </div>
+  </section>
+</div>
+<div class="overlay hidden" id="systemsModal" role="dialog" aria-modal="true" aria-labelledby="systemsTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow" id="systemsShip">БОРТОВЫЕ СИСТЕМЫ</div><h2 id="systemsTitle">Корабль и груз</h2></div><button id="closeSystems">Закрыть</button></div><div class="systemsGrid panelScroll"><div id="cargoSummary"></div><div class="systemSettings"><div class="miningControls"><div><h3>Скорость добычи</h3><p id="miningModeInfo"></p></div><button id="miningMode">Баланс</button></div><div class="miningControls"><div><h3>Управление лучом</h3><p id="beamInfo"></p></div><button id="beamMode" aria-pressed="false">Автодобыча</button></div><div class="industrySupplies"><button id="coolantUse">Охладить</button><button id="cellUse">Энергия</button></div><h3>Распределение мощности</h3><div class="powerModes"><button data-power="balanced">Баланс</button><button data-power="engines">Двигатели</button><button data-power="weapons">Оружие</button><button data-power="shields">Щиты</button></div><p id="powerDescription"></p><button id="flightAssist" aria-pressed="true" title="Гасит дрейф после отпускания тяги">Стабилизация: вкл</button></div></div><div class="dialogActions systemsActions"><button id="repair"><i class="icon icon-repair" aria-hidden="true"></i> Ремонт</button><button id="autoAim" aria-pressed="true">Автоприцел: вкл</button><button id="sound" aria-pressed="true">Звук: вкл.</button><button id="reduceMotion" aria-pressed="false">Снижать тряску: нет</button><button id="save">Сохранить полёт</button><button id="systemsHelp">Справочник</button></div></section></div>
+<div class="overlay hidden" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow" id="contactSubtitle"></div><h2 id="contactTitle"></h2></div><button id="closeContact">Закрыть</button></div><div id="contactIntro" class="contactIntro"></div><div id="contactContent" class="panelScroll"></div></section></div>
+<div class="overlay hidden" id="repairModal" role="dialog" aria-modal="true" aria-labelledby="repairTitle">
+  <section class="confirmPanel repairPanel">
+    <div class="modalHead"><div><div class="eyebrow" id="repairStation">Станция</div><h2 id="repairTitle">Ремонт в доке</h2></div><button id="closeRepair">Закрыть</button></div>
+    <div class="panelScroll"><dl class="repairQuote"><div><dt>Повреждения</dt><dd id="repairDamage"></dd></div><div><dt>Стоимость</dt><dd id="repairCost"></dd></div><div><dt>В трюме</dt><dd id="repairBalance"></dd></div></dl>
+    <p>Док восстановит уцелевшие модули. Потерянные детали можно установить на верфи.</p></div>
+    <div class="dialogActions"><button id="confirmRepair" class="primary">Оплатить и отремонтировать</button></div>
+  </section>
+</div>
+<div class="overlay hidden" id="relicModal" role="dialog" aria-modal="true" aria-labelledby="relicTitle"><section class="relicPanel"><div class="modalHead"><div><div class="eyebrow">Восстановленный архив</div><h2 id="relicTitle"></h2></div><button id="relicLater">Позже</button></div><div class="panelScroll"><p id="relicLore"></p><h3>Выберите один протокол</h3><div id="relicBoons"></div></div></section></div>
+<script src="game.js?v=27"></script><script src="expedition.js?v=27"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=21"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=21"></script><script src="act.js?v=21"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=23"></script><script src="launch.js?v=23"></script><script src="coop.js?v=1"></script><script src="boot.js?v=23"></script></body></html>

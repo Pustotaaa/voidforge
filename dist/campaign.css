@@ -1,0 +1,168 @@
+/* Campaign screens use one dense frame around the active decision. */
+.widePanel, .buildPanel, .mapPanel, .resultPanel { border: 1px solid #fff; box-shadow: inset 0 4px 0 #fff; }
+.modalHead { border-bottom: 1px solid #fff; padding-bottom: 14px; }
+.modalHead .eyebrow { display: inline-block; padding: 3px 7px; background: #fff; color: #000; }
+.panelBalance { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; padding: 0; border: 1px solid #fff; background: #fff; }
+.panelBalance span { min-width: 0; padding: 8px 11px; background: #000; }
+.panelBalance b { display: block; font-size: 20px; }
+#parts button.active { outline: 2px solid #fff; outline-offset: -4px; }
+.tradeRow { border: 1px solid #fff; margin-top: 6px; padding: 9px 11px; }
+.tradeTitle .icon { --icon-size: 23px; }
+.researchLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .55fr); gap: 14px; align-items: start; }
+.treeArea { position: relative; border: 1px solid #fff; padding: 10px; }
+#treeLinks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.techTree { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 25px 8px; }
+.treeNode { min-width: 0; min-height: 80px; display: grid; justify-items: start; align-content: center; text-align: left; gap: 3px; padding: 8px; border: 1px solid #fff; line-height: 1.14; overflow-wrap: anywhere; }
+.treeNode strong { font-size: 14px; }
+.treeNode small { font-size: 12px; }
+.treeNode .icon { --icon-size: 26px; }
+.treeNode.tree-locked { border-style: dashed; }
+.treeNode.tree-done small::before { content: '■ '; }
+.treeNode.tree-ready small::before { content: '◆ '; }
+.treeNode[aria-pressed="true"] { background: #fff; color: #000; }
+.treeNode[aria-pressed="true"]::after { content: ''; width: 21px; height: 2px; background: #000; }
+.techDetail { border: 1px solid #fff; padding: 12px; display: grid; align-content: start; gap: 9px; }
+.techDetail h3 { font-size: 19px; }
+.techDetail .panelMark { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #fff; padding-bottom: 6px; font-weight: 700; }
+.techDetail .panelMark .icon { --icon-size: 30px; }
+.techDetail .detailNote, .techDetail .techCost { font-size: 13px; }
+.techDetail button { justify-self: start; }
+.campaignHero { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 16px; align-items: stretch; border: 1px solid #fff; }
+.campaignHero>div:nth-child(2) { padding: 13px 13px 13px 0; }
+.campaignHero .campaignArt { display: grid; place-items: center; background: repeating-linear-gradient(45deg,#000 0 5px,#fff 5px 6px,#000 6px 11px); border-right: 1px solid #fff; }
+.campaignArt .icon { --icon-size: 62px; background-color: #fff; filter: drop-shadow(2px 2px #000); }
+.campaignHero h2 { font-size: clamp(22px,3vw,32px); line-height: 1.18; margin-bottom: 7px; }
+.campaignProgress { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-top: 9px; }
+.campaignProgress progress { height: 9px; }
+.missionTimeline { display: grid; gap: 5px; }
+.missionStep { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; gap: 8px 12px; align-items: start; border: 1px solid #fff; padding: 10px; }
+.missionStep h3 { font-size: 17px; }
+.missionStep p { font-size: 14px; }
+.stepMark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #fff; }
+.stepMark .icon { --icon-size: 27px; }
+.stageDone .stepMark { background: #fff; color: #000; }
+.stepActions { display: flex; flex-wrap: wrap; justify-content: end; gap: 6px; max-width: 240px; }
+.stepActions button { font-size: 13px; }
+.miningControls { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-block: 1px solid #fff; padding: 11px 0; margin: 13px 0; }
+.bossPlate { width: min(360px,100%); margin: 0 auto; border: 1px solid #fff; padding: 6px 9px; background: #000; }
+.bossTitle { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; font-family: var(--game-font); }
+.bossPlate strong { display: block; font-size: 13px; margin-top: 5px; }
+.bossPlate progress { height: 7px; }
+.flightReadout .miningPlate { display: grid; justify-items: start; max-width: min(390px,100%); padding: 4px 8px; text-align: left; }
+.flightReadout .miningPlate span { border: 0; color: inherit; background: transparent; padding: 0; font-weight: bold; }
+.miningPlate small { font-size: 12px; }
+@media(max-width: 620px) {
+ .panelBalance { grid-template-columns: repeat(2, minmax(0,1fr)); }
+ .researchLayout { grid-template-columns: minmax(0,1fr); gap: 8px; }
+ .techTree { gap: 22px 5px; }
+ .treeArea { padding: 6px; }
+ .treeNode { padding: 5px; min-height: 68px; }
+ .treeNode strong { font-size: 13px; }
+ .treeNode small { font-size: 11px; }
+ .treeNode .icon { --icon-size: 20px; }
+ .missionStep { grid-template-columns: 36px minmax(0,1fr); }
+ .stepActions { grid-column: 2; justify-content: start; max-width: none; }
+ .stepActions:empty { display: none; }
+ .campaignHero { grid-template-columns: 54px minmax(0,1fr); gap: 8px; }
+ .campaignArt .icon { --icon-size: 44px; }
+ .bossPlate { width: min(260px,100%); }
+}
+
+.objectiveTile {
+ display:flex; align-items:center; gap:7px; width:max-content; max-width:100%;
+ margin:0 auto; padding:5px 10px; font-size:13px; text-align:left;
+}
+.objectiveTile .icon { --icon-size:17px; }
+.missionStep.stageActive { border-width:2px; padding:12px; }
+.stageActive .eyebrow { display:inline-block; background:#fff; color:#000; padding:2px 6px; }
+.missionStep.stageDone { align-items:center; }
+@media (max-height:500px) and (orientation:landscape) {
+ .objectiveTile { margin:0; }
+}
+.dockServices { display:flex; flex-wrap:wrap; align-items:center; gap:7px 12px; }
+.dockServices button,.stationTabs button,.marketTabs button { display:flex; align-items:center; justify-content:center; gap:6px; }
+.stationTabs,.marketTabs { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,92px),1fr)); gap:5px; }
+.stationTabs button,.marketTabs button { min-width:0; padding-inline:6px; }
+.marketTabs { max-width:360px; margin:0 0 8px; }
+.marketTabs .icon { --icon-size:18px; }
+@media(max-width:440px) {
+ .stationTabs button { flex-direction:column; font-size:12px; }
+ .tradeActions { width:100%; }
+}
+
+.radioHud { width:min(430px,100%); display:grid; grid-template-columns:36px minmax(0,1fr); align-items:start; gap:8px; margin:2px auto 8px; padding:8px 10px; background:#000; border:1px solid #fff; box-shadow:3px 3px #000; }
+.radioHud .icon { --icon-size:30px; margin-top:4px; }
+.radioHud b,.radioHud span { display:block; }
+.radioHud b { font:700 12px/1.4 var(--game-font); letter-spacing:.08em; }
+.radioHud span { font-size:13px; line-height:1.35; }
+.flightGadgets { grid-column:1/-1; display:flex; flex-wrap:wrap; justify-content:center; gap:5px; }
+.flightGadgets button,.threatBadge { display:flex; align-items:center; gap:5px; padding:5px 8px; font-size:12px; line-height:1.2; }
+.flightGadgets .icon { --icon-size:15px; }
+.flightGadgets button[aria-pressed=true],.threatBadge[data-level="4"],.threatBadge[data-level="5"] { background:#fff; color:#000; }
+.threatBadge { background:#000; border:1px solid #fff; align-self:center; padding:6px; }
+.bossIntro { position:absolute; z-index:18; inset:0; display:grid; place-content:center; text-align:center; pointer-events:none; border-block:clamp(65px,15vh,132px) solid #000; background:rgba(0,0,0,.58); }
+.bossIntro span { font:700 15px var(--game-font); letter-spacing:.18em; }
+.bossIntro strong { font:900 clamp(32px,9vw,96px)/1.1 var(--game-font); letter-spacing:-.055em; text-shadow:3px 3px #000,-3px -3px #000; animation:intro-cut .19s steps(2,jump-none) 4; }
+@keyframes intro-cut { 45% { transform:translateX(5px) skew(-5deg); } 75% { transform:translateX(-4px); } }
+.relicPanel { max-width:570px; }
+.relicPanel h3 { margin-top:17px; font-size:16px; }
+#relicBoons { display:grid; gap:7px; margin-top:9px; }
+#relicBoons button { display:flex; align-items:center; gap:10px; text-align:left; }
+#relicBoons small { display:block; font:inherit; font-size:13px; }
+.actHero { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:12px; border:1px solid #fff; padding:14px; margin-bottom:12px; }
+.actHero h2 { line-height:1.15; margin-bottom:5px; }
+.actHeroGlyph { display:grid; place-items:center; width:54px; height:54px; background:#fff; color:#000; }
+.actHeroGlyph .icon { --icon-size:34px; }
+.actHero button { grid-column:2; justify-self:start; }
+.actTrack { list-style:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr)); gap:6px; padding:0; }
+.actTrack li { display:flex; gap:8px; align-items:center; min-height:45px; border:1px dashed #fff; padding:6px; font-size:13px; }
+.actTrack li.passed { border-style:solid; }
+.actTrack li.current { background:#fff; color:#000; border-style:solid; font-weight:bold; }
+.flightTimeline { padding:8px; border-top:1px solid #fff; }
+.targetCard { position:absolute; top:150px; right:max(12px,env(safe-area-inset-right)); display:grid; width:158px; justify-items:center; background:#000; border:1px solid #fff; padding:5px; pointer-events:auto; }
+.targetCard b,.targetCard small { display:block; font-size:12px; }
+.targetCard canvas { width:100%; margin-top:3px; height:auto; image-rendering:pixelated; touch-action:manipulation; }
+.rareCargo { margin:0 0 10px; }
+@media (pointer:coarse),(max-width:760px) {
+ .flightGadgets { grid-row:3; }
+ .radioHud { max-width:330px; margin:0 auto 5px; }
+ .targetCard { width:108px; right:8px; top:155px; }
+ .flightGadgets button { padding-inline:5px; }
+}
+@media (max-height:500px) and (orientation:landscape) {
+ .flightGadgets { grid-row:3; }
+ .targetCard { right:8px; top:85px; width:110px; }
+ .radioHud { margin-left:3px; }
+}
+@media (prefers-reduced-motion:reduce) {
+ .bossIntro strong { animation:none; }
+}
+
+.bossIntro.still strong { animation:none; }
+#resultModal:not(.hidden) { animation:result-enter .32s ease-out; }
+@keyframes result-enter { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { #resultModal:not(.hidden) { animation:none; } }
+
+@media (max-width:450px) {
+ .flightGadgets:has(#boon:not([hidden])) #cruise { display:none; }
+}
+
+.radioHud { grid-template-columns:44px minmax(0,1fr); }
+.radioPortrait {
+ display:block; width:44px; height:44px; background:#000 url('art/sector-atlas.png') no-repeat;
+ background-size:400% 300%; image-rendering:pixelated; border:1px solid #fff;
+}
+.portrait-lia { background-position:0 100%; }
+.portrait-ai { background-position:33.333% 100%; }
+.portrait-watcher { background-position:66.667% 100%; }
+.bossIntro::before {
+ content:""; position:absolute; width:min(37vmin,250px); aspect-ratio:1;
+ top:50%; left:50%; transform:translate(-50%,-67%);
+ background:url('art/sector-atlas.png') no-repeat 66.667% 100% / 400% 300%;
+ image-rendering:pixelated; opacity:.32;
+}
+.bossIntro > * { position:relative; }
+@media(max-width:450px) {
+ .radioHud { grid-template-columns:36px minmax(0,1fr); }
+ .radioPortrait { width:36px; height:36px; }
+}
