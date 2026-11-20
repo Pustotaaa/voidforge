@@ -10,7 +10,11 @@ function database() {
   prepare(sql) {
    const statement=sqlite.prepare(sql);
    return {bind(...args) {
-    const execute=()=>({meta:{changes:Number(statement.run(...args).changes)}});
+    const execute=()=>{
+     const before=sqlite.prepare('SELECT total_changes() AS count').get().count;
+     statement.run(...args);
+     return {meta:{changes:sqlite.prepare('SELECT total_changes() AS count').get().count-before}};
+    };
     return {
      execute, async run(){return execute();}, async first(){return statement.get(...args)??null;},
      async all(){return {results:statement.all(...args)};},
