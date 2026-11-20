@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="description" content="VOIDFORGE — космическая стратегия в 1-bit. Постройте автономный корабль и освободите Чёрный сектор.">
-<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=27"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=1">
+<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=28"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=1">
 </head>
 <body id="gameUi">
 <img id="sectorAtlas" src="art/sector-atlas.png" alt="" hidden><img id="lunarBackdrop" src="art/lunar-parallax.png" alt="" hidden>
@@ -37,12 +37,13 @@
       <button id="pause" class="utilityTile" aria-label="Пауза" title="Пауза [Пробел]"><i class="icon icon-pause" aria-hidden="true"></i></button>
       <button id="help" class="utilityTile" aria-label="Справка" title="Справка"><i class="icon icon-help" aria-hidden="true"></i></button>
       <button id="openCoop" class="utilityTile" type="button" aria-label="Кооператив" title="Кооператив"><i class="icon icon-station" aria-hidden="true"></i></button>
+      <button id="openSettings" class="utilityTile" type="button" aria-label="Настройки" aria-haspopup="dialog" title="Настройки"><span class="settingsGear" aria-hidden="true">⚙︎</span></button>
       <button id="openMap" class="minimapTile" aria-label="Карта сектора" title="Карта [M]"><canvas id="map" width="190" height="180"></canvas><span><i class="icon icon-map" aria-hidden="true"></i><span class="mapTileLabel">Карта</span></span></button>
     </div>
-      <div class="hudZoom" role="group" aria-label="Масштаб интерфейса">
-        <button id="uiSmaller" type="button" aria-label="Уменьшить интерфейс" title="Уменьшить интерфейс">−</button>
-        <button id="uiDefault" type="button" aria-label="Вернуть масштаб интерфейса к 100%" title="Вернуть 100%">100%</button>
-        <button id="uiLarger" type="button" aria-label="Увеличить интерфейс" title="Увеличить интерфейс">+</button>
+      <div class="hudZoom" role="group" aria-label="Масштаб камеры">
+        <button id="cameraSmaller" type="button" aria-label="Отдалить камеру на 25 процентных пунктов" title="Отдалить камеру">−</button>
+        <button id="cameraDefault" type="button" aria-label="Вернуть масштаб камеры к 100%" title="Вернуть масштаб камеры к 100%">100%</button>
+        <button id="cameraLarger" type="button" aria-label="Приблизить камеру на 25 процентных пунктов" title="Приблизить камеру">+</button>
       </div>
       <aside class="cargoHud" aria-label="Груз корабля">
         <button id="holdHud" class="cargoHudHeader" type="button" aria-haspopup="dialog" title="Открыть полный инвентарь">
@@ -178,6 +179,19 @@
 <div class="overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><section class="confirmPanel"><div class="eyebrow">НОВЫЙ ПОЛЁТ</div><h2 id="confirmTitle">Начать с чистого листа?</h2><p>Текущий корабль и прогресс этого мира будут заменены. Сектор останется тем же.</p><div class="dialogActions"><button id="cancelReset" class="primary">Продолжить текущий</button><button id="confirmReset">Начать заново</button></div></section></div>
 <div class="overlay hidden" id="researchModal" role="dialog" aria-modal="true" aria-labelledby="researchTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">БОРТОВАЯ ЛАБОРАТОРИЯ</div><h2 id="researchTitle">Дерево исследований</h2></div><button id="closeResearch">Закрыть</button></div><div class="panelBalance" id="researchBalance"></div><div class="researchLayout"><div class="panelScroll"><div id="treeArea" class="treeArea"><canvas id="treeLinks" aria-hidden="true"></canvas><div id="techTree" class="techTree"></div></div></div><aside id="techDetail" class="techDetail panelScroll" aria-live="polite"></aside></div></section></div>
 <div class="overlay hidden" id="journalModal" role="dialog" aria-modal="true" aria-labelledby="journalTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">ЭКСПЕДИЦИЯ «ПОРОГ»</div><h2 id="journalTitle">Журнал капитана</h2></div><button id="closeJournal">Закрыть</button></div><div class="panelTabs"><button data-journal="mission" class="active">Экспедиция</button><button data-journal="contracts">Контракты</button><button data-journal="atlas">Атлас</button></div><div class="journalBody panelScroll"><div id="journalContent"></div><div class="journalExtras"><button id="target"><i class="icon icon-target" aria-hidden="true"></i> Отметить ближайшего пирата</button><details><summary>Последние события</summary><div id="log"></div></details></div></div></section></div>
+<div class="overlay hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <section class="confirmPanel settingsPanel">
+    <div class="modalHead"><h2 id="settingsTitle">Настройки</h2><button id="closeSettings" type="button">Закрыть</button></div>
+    <div class="settingsScale">
+      <span>Масштаб интерфейса</span>
+      <div class="hudZoom" role="group" aria-label="Масштаб интерфейса">
+        <button id="uiSmaller" type="button" aria-label="Уменьшить интерфейс" title="Уменьшить интерфейс">−</button>
+        <button id="uiDefault" type="button" aria-label="Вернуть масштаб интерфейса к 100%" title="Вернуть 100%">100%</button>
+        <button id="uiLarger" type="button" aria-label="Увеличить интерфейс" title="Увеличить интерфейс">+</button>
+      </div>
+    </div>
+  </section>
+</div>
 <div class="overlay hidden" id="cargoModal" role="dialog" aria-modal="true" aria-labelledby="cargoTitle">
   <section class="cargoPanel">
     <div class="modalHead"><h2 id="cargoTitle">Инвентарь</h2><button id="closeCargo" type="button">Закрыть</button></div>
@@ -201,4 +215,4 @@
   </section>
 </div>
 <div class="overlay hidden" id="relicModal" role="dialog" aria-modal="true" aria-labelledby="relicTitle"><section class="relicPanel"><div class="modalHead"><div><div class="eyebrow">Восстановленный архив</div><h2 id="relicTitle"></h2></div><button id="relicLater">Позже</button></div><div class="panelScroll"><p id="relicLore"></p><h3>Выберите один протокол</h3><div id="relicBoons"></div></div></section></div>
-<script src="game.js?v=27"></script><script src="expedition.js?v=27"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=21"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=21"></script><script src="act.js?v=21"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=23"></script><script src="launch.js?v=23"></script><script src="coop.js?v=1"></script><script src="boot.js?v=23"></script></body></html>
+<script src="game.js?v=28"></script><script src="expedition.js?v=27"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=21"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=21"></script><script src="act.js?v=21"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=28"></script><script src="launch.js?v=23"></script><script src="coop.js?v=28"></script><script src="boot.js?v=23"></script></body></html>

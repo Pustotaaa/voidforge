@@ -415,4 +415,24 @@ test('camera zoom crosses the old combat boundary smoothly',`
  if(view.zoom!==1)throw Error('combat zoom remained active with reduced motion');
  setReducedMotion(false);
 `);
+test('manual camera zoom is smooth, bounded and separate from interface scale',`
+ closeModal();fresh();s.enemies.forEach(e=>e.dead=true);setReducedMotion(false);
+ setCameraScale(1);view.zoom=1;
+ $('cameraSmaller').click();
+ if(cameraScale!==.75||$('cameraDefault').textContent!=='75%')throw Error('expected a 25-point camera step');
+ updateCamera(1/60);
+ if(view.zoom<=.75||view.zoom>=1)throw Error('camera jumped to its target');
+ const point=viewAt(W/2+view.zoom*40,H/2-view.zoom*25);
+ if(Math.abs(point.x-view.x-40)>1e-8||Math.abs(point.y-view.y+25)>1e-8)throw Error('pointer projection used the wrong zoom');
+ let handled=0;const wheel=deltaY=>c.wheel({deltaY,deltaMode:0,preventDefault(){handled++;}});
+ for(let i=0;i<8;i++)wheel(100);
+ if(cameraScale!==.5||!$('cameraSmaller').disabled)throw Error('camera minimum');
+ for(let i=0;i<12;i++)wheel(-100);
+ if(cameraScale!==1.25||!$('cameraLarger').disabled)throw Error('camera maximum');
+ $('openSettings').click();$('uiSmaller').click();wheel(100);
+ if(modal!=='settingsModal'||cameraScale!==1.25||uiScale!==75||handled!==20)throw Error('camera and UI scales mixed');
+ $('closeSettings').click();$('cameraDefault').click();
+ if(cameraScale!==1||uiScale!==75)throw Error('camera reset changed UI scale');
+ $('uiDefault').click();
+`);
 console.log('All expedition checks passed.');

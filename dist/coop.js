@@ -11,6 +11,7 @@ sharedFlight = (() => {
  const sizes = ['', 'малый', 'средний', 'крупный'];
  const layouts = ['wanderer','courier','hauler'];
  const camera = {x:0,y:0};
+ let roomCameraScale=1;
  const controls = new Set(), gestures = new Map(), ships = new Map();
  let lobby = null, room = null, world = null, target = null;
  let pending = false, syncing = false, timer, lastEvent = 0, noticeUntil = 0, lastFrame = null;
@@ -100,7 +101,7 @@ sharedFlight = (() => {
  function showFlight(data, token) {
   room={code:data.code,token};
   store(sessionKey,JSON.stringify(room));
-  target=null;world=null;lastFrame=null;effects=[];ships.clear();clearInput();
+  target=null;world=null;lastFrame=null;roomCameraScale=cameraScale;effects=[];ships.clear();clearInput();
   lastEvent=data.events.at(-1)?.id||0;
   $('coopModal').classList.add('hidden');
   $('flightHud').hidden=true;
@@ -303,7 +304,7 @@ sharedFlight = (() => {
   if(rock)choose(rock);
   else notice('Все залежи исчерпаны.');
  }
- const zoom=()=>clamp(W/650,.62,1);
+ const zoom=()=>clamp(W/650,.62,1)*roomCameraScale;
  function selectAsteroid(event) {
   if(event.button!==0||!world)return;
   event.preventDefault();
@@ -323,7 +324,9 @@ sharedFlight = (() => {
  function keyUp(event) { if(controls.delete(event.code))later(0); }
 
  function draw(now) {
-  const blend=lastFrame===null?1:1-Math.exp(-Math.min(80,now-lastFrame)*.014);
+  const elapsed=lastFrame===null?0:Math.min(80,now-lastFrame);
+  const blend=lastFrame===null?1:1-Math.exp(-elapsed*.014);
+  roomCameraScale=smoothCameraZoom(roomCameraScale,cameraScale,elapsed/1000);
   lastFrame=now;
   const seen=new Set();
   for(const pilot of world.players){

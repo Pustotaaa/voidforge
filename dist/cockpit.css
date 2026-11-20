@@ -52,7 +52,7 @@ progress::-moz-progress-bar { background: var(--signal); }
 .flightLeft { container-type: inline-size; }
 .flightRight .flightUtility {
   display: grid;
-  grid-template-columns: repeat(3,34px) 62px;
+  grid-template-columns: repeat(4,34px) 62px;
   gap: 4px;
 }
 .flightUtility .utilityTile { min-height: 34px; width: 100%; }
@@ -72,6 +72,11 @@ progress::-moz-progress-bar { background: var(--signal); }
   font: 700 13px var(--game-font);
   font-variant-numeric: tabular-nums;
 }
+.settingsGear { font: 22px/1 system-ui, sans-serif; }
+#settingsModal .settingsPanel { background: rgb(0 0 0 / .94); max-width: 440px; }
+.settingsScale { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.settingsScale .hudZoom { width: min(130px,100%); }
+.settingsScale button { min-height: 38px; }
 .cargoHud {
   width: min(186px,100%);
   border: 1px solid var(--line);
@@ -297,7 +302,7 @@ progress::-moz-progress-bar { background: var(--signal); }
   .flightReports .radioPortrait { display: none; }
 }
 @media (max-width: 620px) {
-  .flightRight .flightUtility { grid-template-columns: repeat(4,minmax(0,1fr)); width: 100%; }
+  .flightRight .flightUtility { grid-template-columns: repeat(5,minmax(0,1fr)); width: 100%; }
   .flightUtility .minimapTile { display: grid; place-items: center; }
   .flightUtility .minimapTile canvas, .flightUtility .mapTileLabel { display: none; }
   .flightUtility .minimapTile > span { border: 0; }
@@ -354,7 +359,7 @@ progress::-moz-progress-bar { background: var(--signal); }
   .systemsGrid { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
 }
 @media (max-width: 460px) {
-  .flightRight .flightUtility { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .flightRight .flightUtility { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .cargoHudHeader { grid-template-columns: minmax(0,1fr) auto; gap: 3px; }
   .cargoHudHeader > i { display: none; }
   .cargoHudHeader b { font-size: 11px; text-align: right; }

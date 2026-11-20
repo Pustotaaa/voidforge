@@ -2,6 +2,25 @@
 
 let reduceMotion=false,shake=0,blastMute=0,introFor=0;
 let view={x:0,y:0,zoom:1},debris=[],bursts=[],muzzles=[],exhaust=[];
+const MIN_CAMERA_SCALE=.5,MAX_CAMERA_SCALE=1.25;
+let cameraScale=1;
+function setCameraScale(value) {
+ cameraScale=clamp(value,MIN_CAMERA_SCALE,MAX_CAMERA_SCALE);
+ const percent=Math.round(cameraScale*100);
+ setHudText('cameraDefault',percent+'%');
+ $('cameraDefault').setAttribute('aria-label','Масштаб камеры '+percent+'%. Вернуть 100%');
+ $('cameraSmaller').disabled=cameraScale<=MIN_CAMERA_SCALE;
+ $('cameraLarger').disabled=cameraScale>=MAX_CAMERA_SCALE;
+}
+function smoothCameraZoom(current,target,dt) {
+ return reduceMotion?target:current+(target-current)*(1-Math.exp(-dt*9));
+}
+$('cameraSmaller').onclick=()=>setCameraScale(cameraScale-.25);
+$('cameraLarger').onclick=()=>setCameraScale(cameraScale+.25);
+$('cameraDefault').onclick=()=>setCameraScale(1);
+$('openSettings').onclick=()=>openModal('settingsModal');
+$('closeSettings').onclick=closeModal;
+
 const previousFlight={x:0,y:0,vx:0,vy:0,angle:0};
 const flightPose={...previousFlight};
 const cameraLead={x:0,y:0};
@@ -31,7 +50,7 @@ function resetPresentation() {
  shake=blastMute=introFor=0;
  debris=[];bursts=[];muzzles=[];exhaust=[];clearEffects();
  syncFlightPose();
- view.zoom=1;
+ view.zoom=cameraScale;
  radioCard=null;
  $('bossIntro').hidden=true;
 }
@@ -114,8 +133,8 @@ function updateCamera(dt) {
   }
  }
  const proximity=clamp((820-nearest)/330,0,1);
- const zoom=1-(W<630?.11:.07)*proximity*proximity*(3-2*proximity);
- view.zoom+=(zoom-view.zoom)*(1-Math.exp(-dt*3.2));
+ const tacticalZoom=1-(W<630?.11:.07)*proximity*proximity*(3-2*proximity);
+ view.zoom=smoothCameraZoom(view.zoom,clamp(cameraScale*tacticalZoom,MIN_CAMERA_SCALE,MAX_CAMERA_SCALE),dt);
  const speed=Math.hypot(flightPose.vx,flightPose.vy);
  const lead=reduceMotion?0:Math.min(.08,50/(speed||1)),cameraStep=1-Math.exp(-dt*8);
  cameraLead.x+=(flightPose.vx*lead-cameraLead.x)*cameraStep;

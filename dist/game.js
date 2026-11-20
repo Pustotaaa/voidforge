@@ -345,6 +345,13 @@ c.onpointercancel = c.onlostpointercapture = e => {
  if (worldPointer?.id === e.pointerId) { worldPointer=null; mouse.down=false;if(beamPointer?.id===e.pointerId)beamPointer=null; }
 };
 c.oncontextmenu=e=>e.preventDefault();
+c.addEventListener('wheel',event=>{
+ if(event.ctrlKey||event.metaKey||!event.deltaY)return;
+ if(!sharedFlight?.active()&&(modal||s.dead))return;
+ event.preventDefault();
+ const unit=event.deltaMode===1?16:event.deltaMode===2?H:1;
+ setCameraScale(cameraScale-clamp(event.deltaY*unit,-160,160)*.0015);
+},{passive:false});
 
 $('pause').onclick=togglePause;$('build').onclick=toggleBuild;$('closeBuild').onclick=closeModal;$('openMap').onclick=toggleMap;$('closeMap').onclick=closeModal;
 $('help').onclick=()=>{if(modal==='resultModal'||modal==='confirmModal')return;openModal('helpModal');};$('closeHelp').onclick=closeModal;
@@ -379,6 +386,7 @@ function editorCell(e){const r=editor.getBoundingClientRect();return {x:Math.rou
 editor.onpointerdown=e=>{e.preventDefault();const p=editorCell(e);editAt(p.x,p.y,e.button===2||removeMode);};editor.oncontextmenu=e=>e.preventDefault();editor.onpointermove=e=>{if(e.pointerType==='touch')return;hoverCell=editorCell(e);renderEditor();};editor.onpointerleave=()=>{hoverCell=null;renderEditor();};
 addEventListener('keydown',e=>{
  if(sharedFlight?.active()){sharedFlight.keyDown(e);return;}
+ if(e.code==='Space'&&e.target?.closest?.('.hudZoom button, .cargoHud button, #openSettings'))return;
  if(e.code==='Tab'&&modal){const items=[...$(modal).querySelectorAll('button:not(:disabled), input:not(:disabled), summary, [tabindex="0"]')].filter(el=>!el.hidden&&el.getClientRects().length),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}return;}
  if(modal&&e.code!=='Escape'&&!((modal==='builder'&&['KeyB','KeyZ'].includes(e.code))||(modal==='mapModal'&&e.code==='KeyM')))return;
  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
