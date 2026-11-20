@@ -135,7 +135,7 @@ const TRADE_SECTIONS={
  supplies:{label:'Снабжение',icon:'cargo',items:['shells','rockets','coolant','cells']}
 };
 let tradeSection='materials';
-function renderMarket(place,root) {
+function renderMarket(place,root,items) {
  const stock=stationMarket(place.id);
  const tabs=document.createElement('div');tabs.className='marketTabs';
  tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Категория товаров');
@@ -151,6 +151,8 @@ function renderMarket(place,root) {
   const b=button(String(size),()=>{tradeQty=size;renderContact();});b.classList.toggle('active',tradeQty===size);toolbar.appendChild(b);
  }
  const hold=document.createElement('span');hold.textContent='Трюм '+cargoUsed()+' / '+cargoMax();toolbar.appendChild(hold);root.appendChild(toolbar);
+ const cards=document.createElement('div');cards.className='marketCards';
+ items.appendChild(cards);
  for(const item of TRADE_SECTIONS[tradeSection].items) {
   const good=GOODS[item],price=marketPrice(place,item,stock[item]),row=document.createElement('article');row.className='tradeRow';
   row.innerHTML='<div><div class="tradeTitle">'+iconMarkup(good.icon)+'<h3>'+good.name+'</h3></div><p>В трюме '+resourceAmount(item)+' · В продаже '+stock[item]+'</p><small>За 1 '+good.unit+': '+price.buy+' кр. покупка / '+price.sell+' кр. продажа'+(price.demand?' · Повышенный спрос':'')+'</small></div>';
@@ -158,7 +160,7 @@ function renderMarket(place,root) {
   const buy=marketOrder(place,item,'buy',tradeQty,stock[item]),sell=marketOrder(place,item,'sell',tradeQty,stock[item]);
   actions.appendChild(button('Купить '+tradeQty+' · '+buy+' кр.',()=>doTrade(item,'buy',tradeQty),stock[item]<tradeQty||s.campaign.credits<buy||freeFor(item)<tradeQty));
   actions.appendChild(button('Продать '+tradeQty+' · '+sell+' кр.',()=>doTrade(item,'sell',tradeQty),resourceAmount(item)<tradeQty));
-  row.appendChild(actions);root.appendChild(row);
+  row.appendChild(actions);cards.appendChild(row);
  }
 
 }

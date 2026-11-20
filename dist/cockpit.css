@@ -1,6 +1,6 @@
 :root {
-  --panel: rgb(0 0 0 / .5);
-  --panel-raised: rgb(14 14 14 / .5);
+  --panel: rgb(0 0 0 / .1);
+  --panel-raised: rgb(14 14 14 / .1);
   --line: #515151;
   --text: #f5f5f5;
   --muted: #bdbdbd;
@@ -358,4 +358,76 @@ progress::-moz-progress-bar { background: var(--signal); }
   .flightNav button .icon, .flightQuick button .icon { --icon-size: 14px; }
   #joystick { --joy: 50px; }
   #fire { width: 49px; height: 49px; }
+}
+
+#contactModal .widePanel:has(.stationLayout) { max-width: 1250px; }
+#contactGrid:not(.stationLayout) #contactSidebar { overflow: visible; }
+#contactGrid.stationLayout {
+  display: grid;
+  grid-template: minmax(0,1fr) / minmax(200px,27%) minmax(0,1fr);
+  gap: 14px;
+  overflow: clip;
+}
+.stationLayout #contactSidebar { padding: 1px 11px 1px 1px; border-right: 1px solid var(--line); }
+.stationLayout #contactItems { padding: 1px 2px 1px 1px; }
+.stationLayout #contactSidebar, .stationLayout #contactContent { display: flex; flex-direction: column; gap: 8px; }
+.stationLayout #contactIntro {
+  order: 1;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  text-shadow: 0 1px 2px #000;
+}
+.stationLayout #contactIntro .npcPortrait { width: 34px; height: 34px; flex: none; font-size: 17px; }
+.stationLayout .panelBalance { grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
+.stationLayout .panelBalance span { padding: 4px 6px; }
+.stationLayout .stationTabs { grid-template-columns: minmax(0,1fr); margin: 0; }
+.stationLayout :is(.stationTabs,.marketTabs) button {
+  min-height: 33px;
+  flex-direction: row;
+  justify-content: start;
+  padding: 3px 6px;
+  text-align: left;
+}
+.stationLayout .marketTabs { grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
+.stationLayout .marketTabs button { justify-content: center; overflow-wrap: anywhere; }
+.stationLayout .quantityRow { gap: 4px; margin: 0; }
+.stationLayout .quantityRow button { min-height: 31px; padding: 2px 8px; }
+.stationLayout .quantityRow span { flex-basis: 100%; margin: 0; font-size: 13px; }
+.stationLayout .dockServices { gap: 3px 8px; }
+.stationLayout .dockServices button { min-height: 34px; padding: 4px 7px; }
+.stationLayout .dockDebt { margin: 0; }
+.marketCards, .stationLayout .destinationGrid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+}
+.marketCards .tradeRow {
+  grid-template-columns: minmax(0,1fr);
+  grid-template-rows: 1fr auto;
+  align-items: start;
+  margin: 0;
+  padding: 8px;
+  gap: 6px;
+  min-width: 0;
+  background: var(--panel);
+  border-color: var(--line);
+  text-shadow: 0 1px 2px #000;
+}
+.marketCards .tradeRow p { font-size: 13px; }
+.marketCards .tradeTitle .icon { --icon-size: 17px; }
+.marketCards .tradeActions { width: 100%; gap: 4px; }
+.marketCards .tradeActions button { min-height: 32px; padding: 3px 5px; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 700px) and (orientation: portrait) {
+  #contactGrid.stationLayout { grid-template: minmax(0,.9fr) minmax(0,1.1fr) / minmax(0,1fr); gap: 6px; }
+  .stationLayout #contactSidebar { padding: 0 2px 5px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .stationLayout .stationTabs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .stationLayout .stationTabs .icon { display: none; }
+  .marketCards .tradeActions { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  #contactGrid.stationLayout { grid-template-columns: minmax(132px,30%) minmax(0,1fr); gap: 6px; }
+  .stationLayout #contactSidebar { padding-right: 4px; }
+  .marketCards .tradeActions { grid-template-columns: minmax(0,1fr); }
 }

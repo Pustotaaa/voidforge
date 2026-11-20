@@ -198,7 +198,10 @@ function renderSystems(){
   '<ul class="cargoManifest">'+countLine+'</ul><div class="systemMetrics">'+metrics.map(([label,value])=>'<span>'+label+'<b>'+value+'</b></span>').join('')+'</div>';
  const desc={balanced:'Стандартная тяга, стрельба и восстановление щита.',engines:'Тяга +30%. Пушки перезаряжаются медленнее (0,40 с).',weapons:'Урон +20%, интервал стрельбы 0,24 с. Восстановление щита вдвое медленнее.',shields:'Восстановление щита +60%. Интервал стрельбы увеличен до 0,42 с.'};$('powerDescription').textContent=desc[s.campaign.power];document.querySelectorAll('[data-power]').forEach(b=>b.classList.toggle('active',b.dataset.power===s.campaign.power));$('flightAssist').textContent='Стабилизация: '+(s.campaign.assist?'вкл':'выкл');$('flightAssist').setAttribute('aria-pressed',String(s.campaign.assist));}
 function openContact(p){if(Math.hypot(s.vx,s.vy)>55){if(modal==='mapModal'||modal==='journalModal')closeModal();brake();toast('Торможение. Для связи снизьте скорость до 55 м/с и нажмите снова.');return;}if(!canInteract(p)){toast('Подлетите ближе к станции, NPC, руинам или вратам');return;}currentContact=p.id;contactTab='trade';cancelPilot();s.vx=s.vy=0;openModal('contactModal');if(p.kind==='station'){lockDockSecurity();save(false);}renderContact();}
-function renderContact(){if(!currentContact)return;const p=allContacts().find(x=>x.id===currentContact);if(!p)return;$('contactTitle').textContent=p.name;$('contactSubtitle').textContent=p.kind==='station'?'СТАНЦИОННАЯ СВЯЗЬ':p.kind==='gate'?'ДРЕВНЯЯ ТРАНЗИТНАЯ СЕТЬ':p.kind==='relic'?'АРХЕОЛОГИЧЕСКИЙ ОБЪЕКТ':'БЛИЖНЯЯ СВЯЗЬ / NPC';const intro=$('contactIntro'),out=$('contactContent');out.replaceChildren();
+function renderContact(){if(!currentContact)return;const p=allContacts().find(x=>x.id===currentContact);if(!p)return;$('contactTitle').textContent=p.name;$('contactSubtitle').textContent=p.kind==='station'?'СТАНЦИОННАЯ СВЯЗЬ':p.kind==='gate'?'ДРЕВНЯЯ ТРАНЗИТНАЯ СЕТЬ':p.kind==='relic'?'АРХЕОЛОГИЧЕСКИЙ ОБЪЕКТ':'БЛИЖНЯЯ СВЯЗЬ / NPC';const intro=$('contactIntro'),out=$('contactContent'),items=$('contactItems');
+ const commercial=p.kind==='station'||p.kind==='merchant';
+ $('contactGrid').classList.toggle('stationLayout',commercial);
+ items.hidden=!commercial;out.replaceChildren();items.replaceChildren();
  if(p.kind==='signal') {
   actState().revealed[p.id]=true;
   const profile=SIGNAL_TYPES[p.signature];$('contactTitle').textContent=profile.title;$('contactSubtitle').textContent='ДАЛЬНИЙ СИГНАЛ';
@@ -238,17 +241,17 @@ function renderContact(){if(!currentContact)return;const p=allContacts().find(x=
      save(false);renderContact();
     },s.campaign.credits<210);special.classList.add('rareCargo');out.appendChild(special);
    }
-   renderMarket(p,out);
+   renderMarket(p,out,items);
   }
-  else if(contactTab==='refinery')renderRefinery(p,out);
-  else {for(const q of CONTRACTS.filter(q=>q.issuer===p.id)){const status=contractStatus(q),row=document.createElement('article');row.className='contractCard';row.innerHTML='<h3>'+q.title+'</h3><p>'+q.desc+'</p><p>'+q.credits+' кр. · '+q.data+' данных</p>';row.appendChild(button(status==='done'?'Выполнен':status==='available'?'Принять контракт':contractReady(q)?'Сдать контракт':'Условия ещё не выполнены',()=>status==='available'?acceptContract(q.id):completeContract(q.id),status==='done'||status==='active'&&!contractReady(q)));out.appendChild(row);}}
+  else if(contactTab==='refinery')renderRefinery(p,items);
+  else {for(const q of CONTRACTS.filter(q=>q.issuer===p.id)){const status=contractStatus(q),row=document.createElement('article');row.className='contractCard';row.innerHTML='<h3>'+q.title+'</h3><p>'+q.desc+'</p><p>'+q.credits+' кр. · '+q.data+' данных</p>';row.appendChild(button(status==='done'?'Выполнен':status==='available'?'Принять контракт':contractReady(q)?'Сдать контракт':'Условия ещё не выполнены',()=>status==='available'?acceptContract(q.id):completeContract(q.id),status==='done'||status==='active'&&!contractReady(q)));items.appendChild(row);}}
  }else if(p.kind==='relic'){const done=s.campaign.scanned.includes(p.id),room=freeCargo()>=15,allowed=actCanScan(p);
   if(done&&isStory()&&!actState().boons[p.id])out.appendChild(button('Выбрать протокол для Смотрителя',()=>showRelicReward(p)));
   else out.appendChild(button(done?'Архив изучен':!allowed?'Доступ откроется по сюжету':!room?'Освободите 15 мест в трюме':'Начать сканирование · '+(isStory()?(p.id==='relic2'?20:9):5)+' с',()=>startScan(p.id),done||!room||!allowed));}
  else if(p.kind==='gate'){if(!s.campaign.gateReady){const list=document.createElement('div');list.className='missionChecks';list.innerHTML=gateRequirements().map(r=>'<div><span>'+ (r.ok?'■':'□')+'</span>'+r.label+'</div>').join('');out.appendChild(list);out.appendChild(button('Восстановить сеть врат',repairGates,!gateRequirements().every(r=>r.ok)));}else{const text=document.createElement('p');text.textContent='Назначение: '+PLACES.find(x=>x.id===p.peer).name+'. '+(s.campaign.gateCooldown>0?'Охлаждение: '+Math.ceil(s.campaign.gateCooldown)+' с полёта. Закройте окно, чтобы продолжить время.':'Канал стабилен.');out.appendChild(text);out.appendChild(button('Совершить переход · 5 крист. / 30 энергии',jumpGate,s.campaign.gateCooldown>0||s.campaign.crystal<5||s.energy<30));}}
  else out.appendChild(button('Принято. Завершить связь',closeModal));
 }
-$('research').onclick=()=>{if(s.dead)return;openModal('researchModal');renderResearch();};$('journal').onclick=()=>{if(s.dead)return;openModal('journalModal');renderJournal();};$('systems').onclick=()=>{if(s.dead)return;openModal('systemsModal');renderSystems();};
+$('research').onclick=()=>{if(s.dead)return;openModal('researchModal');resetResearchView();renderResearch();};$('journal').onclick=()=>{if(s.dead)return;openModal('journalModal');renderJournal();};$('systems').onclick=()=>{if(s.dead)return;openModal('systemsModal');renderSystems();};
 $('closeResearch').onclick=$('closeJournal').onclick=$('closeSystems').onclick=$('closeContact').onclick=closeModal;
 $('interact').onclick=()=>{if(s.dead)return;const p=nearestContact();if(p)openContact(p);else openModal('mapModal');};
 $('systemsHelp').onclick=()=>openModal('helpModal');$('flightAssist').onclick=()=>{s.campaign.assist=!s.campaign.assist;save(false);renderSystems();};

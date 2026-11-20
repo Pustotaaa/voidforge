@@ -1,257 +1,174 @@
 #researchModal {
   padding: 0;
-  background: #070c13;
+  background: #070707;
 }
 #researchModal .researchPanel {
+  position: relative;
   width: 100%;
   height: var(--ui-height);
   max-height: var(--ui-height);
-  padding: clamp(14px,2.4vmin,32px);
-  gap: clamp(8px,1.6vmin,18px);
+  padding: 0;
   border: 0;
   box-shadow: none;
+  background: #080808;
+}
+.researchViewport {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  cursor: grab;
+  touch-action: none;
   background:
-    radial-gradient(ellipse at 18% 0%, #182a3a 0%, transparent 58%),
-    linear-gradient(145deg,#0d1824,#080d15 65%);
+    radial-gradient(circle,#fff3 1px,transparent 1.5px) 0 0 / 30px 30px,
+    radial-gradient(ellipse at 45% 48%,#171717,#080808 68%);
 }
-.researchPanel [data-branch="industry"] { --branch: #78d9ba; }
-.researchPanel [data-branch="flight"] { --branch: #ebc27e; }
-.researchPanel [data-branch="combat"] { --branch: #9fbaff; }
-
-#researchModal .researchHeader {
-  margin: 0;
-  padding: 0 0 clamp(8px,1.5vmin,16px);
-  border-color: #3b5062;
-}
-.researchHeader .eyebrow { color: #a4bccc; }
-.researchHeader h2 { font-size: clamp(24px,4.4vmin,44px); }
-.researchHeader button { padding-inline: 20px; }
-#researchBalance {
-  margin: 0;
-  border: 1px solid #304354;
-  background: #0b131d;
-}
-#researchBalance span {
-  padding: 7px 12px;
-  background: #121f2b;
-  color: #c8d4df;
-}
-
-#researchModal .researchLayout {
-  display: grid;
-  grid-template: minmax(0,1fr) / minmax(0,1fr) minmax(245px,clamp(255px,29%,400px));
-  flex: 1;
-  gap: clamp(8px,1.5vmin,18px);
-}
-.researchBoard, .techDetail {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid #34495c;
-  background: #0a141f;
-}
-.researchBoard {
-  display: grid;
-  grid-template-rows: auto minmax(0,1fr);
-  container-type: inline-size;
-  overflow: hidden;
-}
-.researchBoardHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 5px 12px;
-  padding: 9px 14px;
-  border-bottom: 1px solid #31485a;
-  background: #101d29;
-}
-#researchProgress { color: #ecf6fe; font: 700 13px var(--game-font); }
-.researchLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: #bdcad7;
-  font-size: 12px;
-}
-.researchLegend li { display: flex; align-items: center; gap: 6px; }
-.researchLegend li::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: var(--branch);
-  transform: rotate(45deg);
-}
-.researchBoardScroll {
-  background:
-    repeating-radial-gradient(circle at 50% 18%, transparent 0 67px, #7ebdda20 68px 69px, transparent 70px 112px),
-    radial-gradient(circle,#86b2d03b 1px,transparent 1.5px) 0 0 / 22px 22px,
-    radial-gradient(ellipse at 50% 12%,#142e43,#08111a 72%);
-}
+.researchViewport:focus-visible { outline: 1px dashed #ddd; outline-offset: -3px; }
+.researchViewport.dragging, .researchViewport.dragging button { cursor: grabbing; }
 .treeArea {
-  position: relative;
+  position: absolute;
+  left: 45%;
+  top: 50%;
   isolation: isolate;
-  display: grid;
-  min-height: 100%;
-  align-items: center;
-  padding: clamp(12px,2vmin,26px);
-  overflow: hidden;
+  background: repeating-radial-gradient(circle at 50% 49.33%,transparent 0 89px,#ffffff24 90px 91px,transparent 92px 132px);
 }
 .treeArea::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -35%;
   pointer-events: none;
-  background: linear-gradient(180deg,transparent 44%,#75cef51c 50%,transparent 55%);
-  animation: research-sweep 8s linear infinite;
+  background: conic-gradient(from 0deg at 50% 49.6%,transparent 0 74%,#ffffff0e 97%,#ffffff22 100%);
+  mask-image: radial-gradient(circle,#000 0 18%,transparent 51%);
+  animation: research-sweep 18s linear infinite;
 }
-#treeLinks {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.techTree {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(5,minmax(0,1fr));
-  gap: clamp(21px,4vmin,46px) clamp(6px,1.4vmin,16px);
-}
+#treeLinks, #techTree { position: absolute; inset: 0; width: 100%; height: 100%; }
+#treeLinks { pointer-events: none; }
 #techTree .treeNode {
-  grid-row: var(--node-row);
-  grid-column: var(--node-col);
+  position: absolute;
+  transform: translate(-50%,-50%);
   display: grid;
-  justify-items: center;
+  grid-template: auto auto / 37px minmax(0,1fr);
+  align-items: center;
   align-content: center;
-  gap: 4px;
-  min-width: 0;
-  min-height: 103px;
-  padding: 7px 5px;
-  border: 1px solid #435669;
-  background: linear-gradient(155deg,#172837,#0d1622);
-  color: #eff6fd;
-  line-height: 1.23;
-  text-align: center;
+  gap: 4px 7px;
+  padding: 7px;
+  border: 1px solid #777;
+  background: #111;
+  color: #f5f5f5;
+  line-height: 1.16;
+  text-align: left;
   overflow-wrap: anywhere;
   animation: research-reveal 360ms var(--node-delay) both;
-  transition: background 180ms,border-color 180ms,box-shadow 180ms;
+  transition: border-color 180ms,background 180ms,box-shadow 180ms;
 }
-.researchGlyph,
-.techDetail .panelMark .icon {
-  color: var(--branch);
-}
+#techTree .treeNode[data-tech="survey"] { border: 2px solid #ddd; background: #292929; }
 .researchGlyph {
+  grid-row: 1/3;
   display: grid;
   place-items: center;
-  width: 41px;
-  height: 41px;
-  border: 1px solid color-mix(in srgb,var(--branch) 52%,transparent);
+  width: 34px;
+  height: 34px;
+  border: 1px solid #888;
   border-radius: 50%;
-  background: #0a141e;
 }
-.researchGlyph .icon { --icon-size: 23px; }
+.researchGlyph .icon { --icon-size: 21px; }
 .treeNode strong { font-size: 14px; }
-.treeNode small { color: #b6c4d3; font-size: 12px; }
-#techTree .tree-locked { border-style: dashed; background: #0e1824; color: #c4ceda; }
-.tree-locked .researchGlyph { opacity: .63; }
-.tree-ready small, .tree-done small { color: var(--branch); }
+.treeNode small { color: #c2c2c2; font-size: 12px; }
+#techTree .tree-locked { border-style: dashed; color: #ccc; }
+.tree-locked .researchGlyph { opacity: .65; }
 .tree-ready small::before { content: '◆ '; }
 .tree-done small::before { content: '✓ '; }
 #techTree .treeNode:hover, #techTree .treeNode[aria-pressed="true"] {
-  border-color: var(--branch);
+  border-color: #fff;
   border-style: solid;
-  background: color-mix(in srgb,var(--branch) 16%,#101a26);
+  background: #303030;
 }
-#techTree .treeNode[aria-pressed="true"] {
-  box-shadow: inset 0 -2px var(--branch),0 0 16px color-mix(in srgb,var(--branch) 18%,transparent);
+#techTree .treeNode[aria-pressed="true"] { box-shadow: inset 0 -2px #e7e7e7,0 0 18px #fff3; }
+.treeNode[aria-pressed="true"] .researchGlyph { animation: research-signal 2.8s ease-in-out infinite; }
+
+.researchHeader {
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: clamp(8px,1.5vmin,18px);
+  pointer-events: none;
 }
-.treeNode[aria-pressed="true"] .researchGlyph {
-  animation: research-signal 2.8s ease-in-out infinite;
+.researchHeader button { min-height: 35px; pointer-events: auto; }
+.researchHeader h2 { font-size: clamp(19px,3vmin,31px); line-height: 1.1; text-shadow: 0 1px 3px #000; }
+#researchBalance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 9px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border: 1px solid #fff4;
+  background: #0000001a;
+  color: #ddd;
+  font: 12px var(--game-font);
+  text-shadow: 0 1px 3px #000;
 }
+#researchBalance b { color: #fff; }
 
 .techDetail {
+  position: absolute;
+  z-index: 1;
+  right: clamp(8px,1.5vmin,18px);
+  top: clamp(58px,10vmin,91px);
+  width: clamp(180px,23%,287px);
+  max-height: calc(var(--ui-height) - 110px);
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: clamp(12px,2.25vmin,24px);
-  background: radial-gradient(ellipse at top left,#1a2d3f,#101b29 55%,#0a131f);
-  border-top-color: var(--branch,#617b91);
+  gap: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: clamp(8px,1.4vmin,14px);
+  border: 1px solid #aaa;
+  background: #0000001a;
+  backdrop-filter: blur(8px) brightness(.48);
+  text-shadow: 0 1px 2px #000;
 }
-.researchDetailIntro { display: grid; gap: 8px; min-width: 0; animation: research-detail 210ms ease-out both; }
-.techDetail .panelMark {
+.researchDetailIntro { display: grid; gap: 5px; min-width: 0; animation: research-detail 210ms ease-out both; }
+.techDetail .panelMark { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.techDetail .panelMark .icon { --icon-size: clamp(24px,4vmin,40px); }
+.techDetail h3 { font-size: clamp(15px,2.2vmin,23px); line-height: 1.1; overflow-wrap: anywhere; }
+.techDetail p { color: #ddd; font-size: 13px; line-height: 1.35; }
+.techDetail .detailNote { padding-top: 5px; border-top: 1px solid #ffffff50; font-size: 12px; }
+.detailNote b { color: #fff; }
+.techCost { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 3px; margin: 0; padding: 0; list-style: none; }
+.techCost li { display: grid; align-content: start; gap: 2px; padding: 3px; border: 1px solid #ffffff50; }
+.techCost span, .techCost small { color: #ccc; font-size: 10px; overflow-wrap: anywhere; }
+.techCost strong { color: #fff; font: 700 14px var(--game-font); }
+.techDetail > button { justify-self: start; min-height: 32px; padding: 4px 8px; font-size: 13px; text-shadow: none; }
+.techDetail[data-state="ready"] > button { color: #111; background: #f1f1f1; border-color: #fff; font-weight: 700; }
+.techDetail[data-state="ready"] > button:hover { background: #cfcfcf; }
+.researchZoom {
+  position: absolute;
+  z-index: 1;
+  left: clamp(8px,1.5vmin,18px);
+  bottom: max(8px,env(safe-area-inset-bottom));
   display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--branch);
-  font-weight: 700;
+  gap: 4px;
+  background: #0000001a;
+  backdrop-filter: blur(5px);
 }
-.techDetail .panelMark .icon { --icon-size: clamp(32px,5vmin,56px); }
-.techDetail h3 { font-size: clamp(19px,2.8vmin,32px); line-height: 1.15; overflow-wrap: anywhere; }
-.techDetail p { color: #d3dee9; }
-.techDetail .detailNote { border-top: 1px solid #35495b; padding-top: 10px; font-size: 14px; }
-.detailNote b { display: block; color: #f0f6fb; }
-.techCost {
-  display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.techCost li { display: grid; align-content: start; padding: 6px; border: 1px solid #405469; background: #0b1521; }
-.techCost span, .techCost small { color: #bdcbda; font-size: 12px; overflow-wrap: anywhere; }
-.techCost strong { color: #eff7ff; font: 700 16px var(--game-font); }
-.techCost small { color: #f0be96; }
-.techDetail > button { justify-self: start; }
-.techDetail[data-state="ready"] > button {
-  color: #09151b;
-  background: var(--branch);
-  border-color: var(--branch);
-  font-weight: 700;
-}
-.techDetail[data-state="ready"] > button:hover { background: #f4faff; }
-
-@container (max-width: 660px) {
-  .techTree { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 19px 7px; }
-  #techTree .treeNode { grid-row: var(--compact-row); grid-column: var(--compact-col); min-height: 78px; }
-  .researchGlyph { width: 32px; height: 32px; }
-  .researchGlyph .icon { --icon-size: 19px; }
-  .treeNode strong { font-size: 13px; }
-}
-@container (max-width: 400px) {
-  .treeArea { padding-inline: 12px; }
-  .techTree { gap: 16px 5px; }
-  #techTree .treeNode { padding: 4px 3px; min-height: 68px; }
-  .treeNode strong, .treeNode small { font-size: 11px; }
-}
+.researchZoom button { min-height: 33px; padding: 3px 8px; font: 700 13px var(--game-font); }
 @media (max-width: 700px) and (orientation: portrait) {
-  #researchModal .researchPanel { padding: 8px; gap: 7px; }
-  #researchModal .researchLayout { grid-template: minmax(0,1.24fr) minmax(0,1fr) / minmax(0,1fr); gap: 7px; }
-  #researchBalance span { padding: 4px 7px; }
-  .researchBoardHead { padding: 5px 9px; }
-  .researchLegend { gap: 2px 9px; font-size: 11px; }
-  .techDetail { gap: 8px; padding: 9px; }
+  .treeArea { left: 48%; top: 42%; }
+  .techDetail { top: auto; bottom: max(8px,env(safe-area-inset-bottom)); width: min(185px,51%); max-height: min(48%,260px); }
 }
-@media (max-height: 480px) and (orientation: landscape) {
-  #researchModal .researchPanel { padding: 7px; gap: 6px; }
-  #researchModal .researchLayout { grid-template-columns: minmax(0,1.32fr) minmax(0,1fr); }
-  #researchModal .researchHeader { padding-bottom: 4px; }
-  .researchHeader h2 { font-size: 20px; }
-  .researchHeader button { min-height: 34px; }
-  #researchBalance span { padding: 3px 6px; }
-  .researchBoardHead { padding: 5px 8px; }
-  .techDetail { gap: 8px; }
+@media (max-height: 470px) and (orientation: landscape) {
+  .techDetail { width: min(190px,37%); max-height: calc(var(--ui-height) - 75px); }
+  .techDetail p { font-size: 12px; }
 }
-@keyframes research-sweep { from { transform: translateY(-60%); } to { transform: translateY(60%); } }
+@keyframes research-sweep { to { transform: rotate(360deg); } }
 @keyframes research-reveal { from { opacity: 0; } to { opacity: 1; } }
 @keyframes research-detail { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @keyframes research-signal {
-  0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--branch) 10%,transparent); }
-  50% { box-shadow: 0 0 0 5px color-mix(in srgb,var(--branch) 18%,transparent); }
+  0%,100% { box-shadow: 0 0 0 0 #fff2; }
+  50% { box-shadow: 0 0 0 5px #fff3; }
 }
 #gameUi:has(#bossIntro.still) .researchPanel *,
 #gameUi:has(#bossIntro.still) .treeArea::before { animation: none; transition: none; }

@@ -284,16 +284,83 @@ function drawBossTelegraph() {
 }
 
 let selectedTech='survey';
-// Rows and columns of the wide schematic. Compact layouts use the existing technology grid.
+const researchSize={width:1260,height:900};
+const researchNodeSize={width:166,height:90};
 const researchPositions={
- survey:[1,3,'flight'],
- geology:[2,1,'industry'],fieldService:[2,2,'industry'],
- ionDrive:[2,3,'flight'],capacitors:[2,5,'combat'],
- drilling:[3,1,'industry'],warp:[3,2,'flight'],shields:[3,3,'combat'],
- railgun:[3,4,'combat'],plasmaTech:[3,5,'combat'],
- tractor:[4,1,'industry'],interceptTech:[4,3,'combat'],
- missileTech:[4,4,'combat'],empTech:[4,5,'combat']
+ survey:[630,444],
+ geology:[425,354],drilling:[264,241],tractor:[109,119],fieldService:[401,592],
+ ionDrive:[631,220],warp:[446,114],
+ capacitors:[825,453],shields:[903,286],interceptTech:[1068,155],
+ railgun:[1022,426],missileTech:[1155,556],plasmaTech:[878,631],empTech:[1061,771]
 };
+const researchViewport=$('researchViewport');
+const researchScene=$('treeArea');
+const researchView={x:0,y:0,zoom:1};
+let researchDrag=null;
+researchScene.style.width=researchSize.width+'px';
+researchScene.style.height=researchSize.height+'px';
+
+function researchViewportSize() {
+ const rect=researchViewport.getBoundingClientRect();
+ const uiScale=Number($('gameUi').dataset.uiScale||100)/100;
+ return {width:rect.width/uiScale,height:rect.height/uiScale,uiScale};
+}
+function setResearchView(x,y,zoom) {
+ const {width,height}=researchViewportSize();
+ researchView.zoom=clamp(zoom,.42,1.75);
+ const maxX=Math.max(0,(width+researchSize.width*researchView.zoom)/2-125);
+ const maxY=Math.max(0,(height+researchSize.height*researchView.zoom)/2-90);
+ researchView.x=clamp(x,-maxX,maxX);
+ researchView.y=clamp(y,-maxY,maxY);
+ researchScene.style.transform='translate(-50%,-50%) translate('+researchView.x+'px,'+researchView.y+'px) scale('+researchView.zoom+')';
+ setHudText('researchZoomReset',Math.round(researchView.zoom*100)+'%');
+ $('researchZoomOut').disabled=researchView.zoom<=.42;
+ $('researchZoomIn').disabled=researchView.zoom>=1.75;
+}
+function resetResearchView() {
+ const {width,height}=researchViewportSize();
+ setResearchView(0,0,clamp(Math.min((width-64)/researchSize.width,(height-88)/researchSize.height),.58,1));
+}
+$('researchZoomOut').onclick=()=>setResearchView(researchView.x,researchView.y,researchView.zoom/1.2);
+$('researchZoomIn').onclick=()=>setResearchView(researchView.x,researchView.y,researchView.zoom*1.2);
+$('researchZoomReset').onclick=resetResearchView;
+researchViewport.onpointerdown=event=>{
+ if(event.button!==0||researchDrag||event.target.closest('button'))return;
+ researchDrag={id:event.pointerId,screenX:event.clientX,screenY:event.clientY,x:researchView.x,y:researchView.y};
+ researchViewport.setPointerCapture(event.pointerId);
+ researchViewport.classList.add('dragging');
+};
+researchViewport.onpointermove=event=>{
+ if(researchDrag?.id!==event.pointerId)return;
+ const {uiScale}=researchViewportSize();
+ setResearchView(researchDrag.x+(event.clientX-researchDrag.screenX)/uiScale,
+  researchDrag.y+(event.clientY-researchDrag.screenY)/uiScale,researchView.zoom);
+};
+function stopResearchDrag(event) {
+ if(researchDrag?.id!==event.pointerId)return;
+ researchDrag=null;
+ researchViewport.classList.remove('dragging');
+}
+researchViewport.onpointerup=researchViewport.onpointercancel=researchViewport.onlostpointercapture=stopResearchDrag;
+researchViewport.addEventListener('wheel',event=>{if(!event.ctrlKey&&!event.metaKey)event.preventDefault();},{passive:false});
+researchViewport.addEventListener('keydown',event=>{
+ const offsets={ArrowLeft:[90,0],ArrowRight:[-90,0],ArrowUp:[0,90],ArrowDown:[0,-90]};
+ const direction=offsets[event.code];
+ if(!direction)return;
+ event.preventDefault();
+ setResearchView(researchView.x+direction[0],researchView.y+direction[1],researchView.zoom);
+});
+researchViewport.addEventListener('focusin',event=>{
+ const node=event.target.closest('.treeNode');
+ if(!node)return;
+ const area=researchViewport.getBoundingClientRect(), bounds=node.getBoundingClientRect();
+ const {uiScale}=researchViewportSize();
+ const dx=bounds.left<area.left?area.left-bounds.left+14:
+  bounds.right>area.right?area.right-bounds.right-14:0;
+ const dy=bounds.top<area.top?area.top-bounds.top+14:
+  bounds.bottom>area.bottom?area.bottom-bounds.bottom-14:0;
+ if(dx||dy)setResearchView(researchView.x+dx/uiScale,researchView.y+dy/uiScale,researchView.zoom);
+});
 function researchStatus(tech) {
  if(hasTech(tech.id))return 'done';
  if(!tech.requires.every(hasTech))return 'locked';
@@ -305,7 +372,6 @@ function selectResearch(tech,reveal=false) {
  selectedTech=tech.id;
  for(const node of document.querySelectorAll('[data-tech]'))node.setAttribute('aria-pressed',String(node.dataset.tech===selectedTech));
  const detail=$('techDetail'), state=researchStatus(tech);
- detail.dataset.branch=researchPositions[tech.id]?.[2]||'flight';
  detail.dataset.state=state;
  const needs=tech.requires.map(id=>TECHS.find(x=>x.id===id).name);
  const cc=s.campaign;
@@ -322,37 +388,29 @@ function selectResearch(tech,reveal=false) {
  detail.scrollTop=0;
  if(reveal)writeTechConnections();
 }
+function researchNodePosition(tech) {
+ return researchPositions[tech.id]||[210+tech.col*195,100+tech.row*139];
+}
 function writeTechConnections() {
  if(modal!=='researchModal')return;
- const canvas=$('treeLinks'), box=$('treeArea').getBoundingClientRect();
- if(!box.width||!box.height)return;
- const g=canvas.getContext('2d'), ratio=Math.min(devicePixelRatio||1,2);
- canvas.width=Math.round(box.width*ratio);canvas.height=Math.round(box.height*ratio);
- g.setTransform(ratio,0,0,ratio,0,0);
- g.clearRect(0,0,box.width,box.height);
- const nodes=new Map([...document.querySelectorAll('[data-tech]')].map(node=>[node.dataset.tech,node.getBoundingClientRect()]));
+ const canvas=$('treeLinks'),ratio=Math.min(devicePixelRatio||1,2);
+ const {width,height}=researchSize,g=canvas.getContext('2d');
+ const pixelsWide=Math.round(width*ratio),pixelsHigh=Math.round(height*ratio);
+ if(canvas.width!==pixelsWide)canvas.width=pixelsWide;
+ if(canvas.height!==pixelsHigh)canvas.height=pixelsHigh;
+ g.setTransform(ratio,0,0,ratio,0,0);g.clearRect(0,0,width,height);
+ const nodes=new Map(TECHS.map(tech=>[tech.id,researchNodePosition(tech)]));
  for(const tech of TECHS) {
-  const to=nodes.get(tech.id);
-  if(!to)continue;
+  const [x2,y2]=nodes.get(tech.id);
   for(const parent of tech.requires) {
-   const from=nodes.get(parent);
-   if(!from)continue;
-   const x1=from.left-box.left+from.width/2,x2=to.left-box.left+to.width/2;
-   const y1=from.bottom-box.top,y2=to.top-box.top;
-   const active=tech.id===selectedTech, unlocked=hasTech(parent);
-   g.strokeStyle=active?'#dff7fd':unlocked?'#7195ad':'#35485a';
-   g.lineWidth=active?1.7:1;
-   g.setLineDash(unlocked?[]:[3,4]);
-   g.beginPath();g.moveTo(x1,y1);
-   if(y2-y1>from.height) {
-    const lane=x1<box.width/2?9:box.width-9;
-    g.lineTo(x1,y1+8);g.lineTo(lane,y1+8);
-    g.lineTo(lane,y2-8);g.lineTo(x2,y2-8);g.lineTo(x2,y2);
-   } else {
-    const middle=(y1+y2)/2;
-    g.bezierCurveTo(x1,middle,x2,middle,x2,y2);
-   }
-   g.stroke();
+   const [x1,y1]=nodes.get(parent),active=tech.id===selectedTech||parent===selectedTech,unlocked=hasTech(parent);
+   const dx=x2-x1,dy=y2-y1;
+   const inset=1/Math.max(Math.abs(dx)/(researchNodeSize.width/2),Math.abs(dy)/(researchNodeSize.height/2));
+   const startX=x1+dx*inset,startY=y1+dy*inset,endX=x2-dx*inset,endY=y2-dy*inset;
+   g.strokeStyle=active?'#fff':unlocked?'#aaa':'#555';
+   g.lineWidth=active?2:1;
+   g.setLineDash(unlocked?[]:[4,6]);
+   g.beginPath();g.moveTo(startX,startY);g.lineTo(endX,endY);g.stroke();
   }
  }
  g.setLineDash([]);
@@ -360,25 +418,24 @@ function writeTechConnections() {
 function renderResearch() {
  const tree=$('techTree');
  $('researchBalance').innerHTML=balanceMarkup();
- setHudText('researchProgress','Изучено '+TECHS.filter(tech=>hasTech(tech.id)).length+' / '+TECHS.length);
  tree.replaceChildren();
  const ordered=[...TECHS].sort((a,b)=>a.row-b.row||a.col-b.col);
  for(const [index,tech] of ordered.entries()) {
-  const state=researchStatus(tech);
-  const [row,col,branch]=researchPositions[tech.id]||[tech.row+1,tech.col,'flight'];
+  const state=researchStatus(tech),[x,y]=researchNodePosition(tech);
   const node=button('',()=>selectResearch(tech,true));
   node.dataset.tech=tech.id;
-  node.dataset.branch=branch;
   node.className='treeNode tree-'+state;
-  node.style.cssText='--node-row:'+row+';--node-col:'+col+';--compact-row:'+Math.max(1,tech.row)+
-   ';--compact-col:'+tech.col+';--node-delay:'+index*20+'ms';
+  node.style.cssText='left:'+x+'px;top:'+y+'px;width:'+researchNodeSize.width+'px;height:'+
+   researchNodeSize.height+'px;--node-delay:'+index*20+'ms';
   node.innerHTML='<span class="researchGlyph">'+iconMarkup(tech.icon)+'</span><strong>'+tech.name+'</strong><small>'+researchLabels[state]+'</small>';
   tree.appendChild(node);
  }
  selectResearch(TECHS.find(t=>t.id===selectedTech)||TECHS[0]);
  requestAnimationFrame(writeTechConnections);
 }
-addEventListener('resize',writeTechConnections);
+addEventListener('resize',()=>{
+ if(modal==='researchModal')setResearchView(researchView.x,researchView.y,researchView.zoom);
+});
 
 function nextRelic() {
  return PLACES.filter(p=>p.kind==='relic'&&!s.campaign.scanned.includes(p.id)).sort((a,b)=>distance(s,a)-distance(s,b))[0];
