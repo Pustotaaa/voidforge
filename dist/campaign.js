@@ -284,6 +284,16 @@ function drawBossTelegraph() {
 }
 
 let selectedTech='survey';
+// Rows and columns of the wide schematic. Compact layouts use the existing technology grid.
+const researchPositions={
+ survey:[1,3,'flight'],
+ geology:[2,1,'industry'],fieldService:[2,2,'industry'],
+ ionDrive:[2,3,'flight'],capacitors:[2,5,'combat'],
+ drilling:[3,1,'industry'],warp:[3,2,'flight'],shields:[3,3,'combat'],
+ railgun:[3,4,'combat'],plasmaTech:[3,5,'combat'],
+ tractor:[4,1,'industry'],interceptTech:[4,3,'combat'],
+ missileTech:[4,4,'combat'],empTech:[4,5,'combat']
+};
 function researchStatus(tech) {
  if(hasTech(tech.id))return 'done';
  if(!tech.requires.every(hasTech))return 'locked';
@@ -291,31 +301,36 @@ function researchStatus(tech) {
  return cc.data>=tech.data&&cc.crystal>=tech.crystal&&cc.credits>=tech.credits?'ready':'funds';
 }
 const researchLabels={done:'Изучено',locked:'Закрыто',ready:'Доступно',funds:'Нужны ресурсы'};
-function selectResearch(tech, reveal=false) {
+function selectResearch(tech,reveal=false) {
  selectedTech=tech.id;
- for(const n of document.querySelectorAll('[data-tech]'))n.setAttribute('aria-pressed',String(n.dataset.tech===selectedTech));
+ for(const node of document.querySelectorAll('[data-tech]'))node.setAttribute('aria-pressed',String(node.dataset.tech===selectedTech));
  const detail=$('techDetail'), state=researchStatus(tech);
+ detail.dataset.branch=researchPositions[tech.id]?.[2]||'flight';
+ detail.dataset.state=state;
  const needs=tech.requires.map(id=>TECHS.find(x=>x.id===id).name);
  const cc=s.campaign;
- detail.innerHTML='<div class="panelMark">'+iconMarkup(tech.icon)+'<span>'+researchLabels[state]+'</span></div><h3>'+tech.name+'</h3><p>'+tech.desc+'</p>';
- if(needs.length)detail.innerHTML+='<p class="detailNote">Требуется: '+needs.join(' + ')+'</p>';
+ detail.innerHTML='<div class="researchDetailIntro"><div class="panelMark">'+iconMarkup(tech.icon)+
+  '<span>'+researchLabels[state]+'</span></div><h3>'+tech.name+'</h3><p>'+tech.desc+'</p></div>';
+ if(needs.length)detail.innerHTML+='<p class="detailNote"><b>Требуется</b> '+needs.join(' · ')+'</p>';
  if(state!=='done') {
-  const costs=[[tech.data,cc.data,'данных'],[tech.crystal,cc.crystal,'крист.'],[tech.credits,cc.credits,'кр.']];
-  detail.innerHTML+='<div class="techCost">'+costs.map(([price,have,label])=>
-   '<span>'+price+' '+label+(have<price?' <b>−'+(price-have)+'</b>':'')+'</span>').join('')+'</div>';
+  const costs=[[tech.data,cc.data,'Данные'],[tech.crystal,cc.crystal,'Кристаллы'],[tech.credits,cc.credits,'Кредиты']];
+  detail.innerHTML+='<ul class="techCost" aria-label="Стоимость исследования">'+costs.map(([price,have,label])=>
+   '<li><span>'+label+'</span><strong>'+price+'</strong>'+
+   (have<price?'<small>Не хватает '+(price-have)+'</small>':'')+'</li>').join('')+'</ul>';
+  detail.appendChild(button('Исследовать',()=>researchTech(tech.id),state!=='ready'));
  }
- if(state!=='done')detail.appendChild(button('Исследовать',()=>researchTech(tech.id),state!=='ready'));
+ detail.scrollTop=0;
  if(reveal)writeTechConnections();
 }
 function writeTechConnections() {
  if(modal!=='researchModal')return;
  const canvas=$('treeLinks'), box=$('treeArea').getBoundingClientRect();
+ if(!box.width||!box.height)return;
  const g=canvas.getContext('2d'), ratio=Math.min(devicePixelRatio||1,2);
  canvas.width=Math.round(box.width*ratio);canvas.height=Math.round(box.height*ratio);
  g.setTransform(ratio,0,0,ratio,0,0);
  g.clearRect(0,0,box.width,box.height);
  const nodes=new Map([...document.querySelectorAll('[data-tech]')].map(node=>[node.dataset.tech,node.getBoundingClientRect()]));
- g.strokeStyle='#fff';
  for(const tech of TECHS) {
   const to=nodes.get(tech.id);
   if(!to)continue;
@@ -323,17 +338,21 @@ function writeTechConnections() {
    const from=nodes.get(parent);
    if(!from)continue;
    const x1=from.left-box.left+from.width/2,x2=to.left-box.left+to.width/2;
-   const y1=from.bottom-box.top,y2=to.top-box.top, step=Math.min(9,(y2-y1)/2), bend=y2-step;
-   const active=tech.id===selectedTech;
-   g.strokeStyle=active?'#fff':hasTech(parent)?'#848484':'#505050';
-   g.lineWidth=active?2:1;
-   g.setLineDash(hasTech(parent)?[]:[2,4]);
+   const y1=from.bottom-box.top,y2=to.top-box.top;
+   const active=tech.id===selectedTech, unlocked=hasTech(parent);
+   g.strokeStyle=active?'#dff7fd':unlocked?'#7195ad':'#35485a';
+   g.lineWidth=active?1.7:1;
+   g.setLineDash(unlocked?[]:[3,4]);
    g.beginPath();g.moveTo(x1,y1);
-   if(tech.row-TECHS.find(t=>t.id===parent).row>1) {
-    const lane=x1<box.width/2?3:box.width-3;
-    g.lineTo(x1,y1+step);g.lineTo(lane,y1+step);g.lineTo(lane,bend);
-   } else g.lineTo(x1,bend);
-   g.lineTo(x2,bend);g.lineTo(x2,y2);g.stroke();
+   if(y2-y1>from.height) {
+    const lane=x1<box.width/2?9:box.width-9;
+    g.lineTo(x1,y1+8);g.lineTo(lane,y1+8);
+    g.lineTo(lane,y2-8);g.lineTo(x2,y2-8);g.lineTo(x2,y2);
+   } else {
+    const middle=(y1+y2)/2;
+    g.bezierCurveTo(x1,middle,x2,middle,x2,y2);
+   }
+   g.stroke();
   }
  }
  g.setLineDash([]);
@@ -341,14 +360,19 @@ function writeTechConnections() {
 function renderResearch() {
  const tree=$('techTree');
  $('researchBalance').innerHTML=balanceMarkup();
+ setHudText('researchProgress','Изучено '+TECHS.filter(tech=>hasTech(tech.id)).length+' / '+TECHS.length);
  tree.replaceChildren();
- for(const tech of TECHS) {
+ const ordered=[...TECHS].sort((a,b)=>a.row-b.row||a.col-b.col);
+ for(const [index,tech] of ordered.entries()) {
   const state=researchStatus(tech);
+  const [row,col,branch]=researchPositions[tech.id]||[tech.row+1,tech.col,'flight'];
   const node=button('',()=>selectResearch(tech,true));
   node.dataset.tech=tech.id;
+  node.dataset.branch=branch;
   node.className='treeNode tree-'+state;
-  node.style.gridRow=String(tech.row+1);node.style.gridColumn=String(tech.col);
-  node.innerHTML=iconMarkup(tech.icon)+'<strong>'+tech.name+'</strong><small>'+researchLabels[state]+'</small>';
+  node.style.cssText='--node-row:'+row+';--node-col:'+col+';--compact-row:'+Math.max(1,tech.row)+
+   ';--compact-col:'+tech.col+';--node-delay:'+index*20+'ms';
+  node.innerHTML='<span class="researchGlyph">'+iconMarkup(tech.icon)+'</span><strong>'+tech.name+'</strong><small>'+researchLabels[state]+'</small>';
   tree.appendChild(node);
  }
  selectResearch(TECHS.find(t=>t.id===selectedTech)||TECHS[0]);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="description" content="VOIDFORGE — космическая стратегия в 1-bit. Постройте автономный корабль и освободите Чёрный сектор.">
-<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=28"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=2">
+<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=29"><link rel="stylesheet" href="cockpit.css?v=29"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=2"><link rel="stylesheet" href="research.css?v=1">
 </head>
 <body id="gameUi">
 <img id="sectorAtlas" src="art/sector-atlas.png" alt="" hidden><img id="lunarBackdrop" src="art/lunar-parallax.png" alt="" hidden>
@@ -232,7 +232,29 @@
 </div>
 <div class="overlay hidden" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="resultTitle"><section class="resultPanel"><div class="eyebrow" id="resultEyebrow"></div><div class="resultGlyph" id="resultGlyph"></div><h1 id="resultTitle"></h1><p id="resultText"></p><div id="resultStats" class="panelScroll"></div><div class="dialogActions"><button id="resultContinue" class="primary"></button><button id="resultRestart">Новый полёт</button></div></section></div>
 <div class="overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><section class="confirmPanel"><div class="eyebrow">НОВЫЙ ПОЛЁТ</div><h2 id="confirmTitle">Начать с чистого листа?</h2><p>Текущий корабль и прогресс этого мира будут заменены. Сектор останется тем же.</p><div class="dialogActions"><button id="cancelReset" class="primary">Продолжить текущий</button><button id="confirmReset">Начать заново</button></div></section></div>
-<div class="overlay hidden" id="researchModal" role="dialog" aria-modal="true" aria-labelledby="researchTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">БОРТОВАЯ ЛАБОРАТОРИЯ</div><h2 id="researchTitle">Дерево исследований</h2></div><button id="closeResearch">Закрыть</button></div><div class="panelBalance" id="researchBalance"></div><div class="researchLayout"><div class="panelScroll"><div id="treeArea" class="treeArea"><canvas id="treeLinks" aria-hidden="true"></canvas><div id="techTree" class="techTree"></div></div></div><aside id="techDetail" class="techDetail panelScroll" aria-live="polite"></aside></div></section></div>
+<div class="overlay hidden" id="researchModal" role="dialog" aria-modal="true" aria-labelledby="researchTitle">
+  <section class="researchPanel">
+    <header class="modalHead researchHeader">
+      <div><div class="eyebrow">Бортовая лаборатория</div><h2 id="researchTitle">Дерево исследований</h2></div>
+      <button id="closeResearch" type="button">Закрыть</button>
+    </header>
+    <div class="panelBalance" id="researchBalance"></div>
+    <div class="researchLayout">
+      <div class="researchBoard">
+        <div class="researchBoardHead">
+          <span id="researchProgress"></span>
+          <ul class="researchLegend" aria-label="Направления исследований">
+            <li data-branch="industry">Промышленность</li><li data-branch="flight">Навигация</li><li data-branch="combat">Боевые системы</li>
+          </ul>
+        </div>
+        <div class="researchBoardScroll panelScroll" tabindex="0" role="region" aria-label="Схема технологий">
+          <div id="treeArea" class="treeArea"><canvas id="treeLinks" aria-hidden="true"></canvas><div id="techTree" class="techTree"></div></div>
+        </div>
+      </div>
+      <aside id="techDetail" class="techDetail panelScroll" aria-live="polite" aria-label="Описание технологии"></aside>
+    </div>
+  </section>
+</div>
 <div class="overlay hidden" id="journalModal" role="dialog" aria-modal="true" aria-labelledby="journalTitle"><section class="widePanel"><div class="modalHead"><div><div class="eyebrow">ЭКСПЕДИЦИЯ «ПОРОГ»</div><h2 id="journalTitle">Журнал капитана</h2></div><button id="closeJournal">Закрыть</button></div><div class="panelTabs"><button data-journal="mission" class="active">Экспедиция</button><button data-journal="contracts">Контракты</button><button data-journal="atlas">Атлас</button></div><div class="journalBody panelScroll"><div id="journalContent"></div><div class="journalExtras"><button id="target"><i class="icon icon-target" aria-hidden="true"></i> Отметить ближайшего пирата</button><details><summary>Последние события</summary><div id="log"></div></details></div></div></section></div>
 <div class="overlay hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
   <section class="confirmPanel settingsPanel">
@@ -270,4 +292,4 @@
   </section>
 </div>
 <div class="overlay hidden" id="relicModal" role="dialog" aria-modal="true" aria-labelledby="relicTitle"><section class="relicPanel"><div class="modalHead"><div><div class="eyebrow">Восстановленный архив</div><h2 id="relicTitle"></h2></div><button id="relicLater">Позже</button></div><div class="panelScroll"><p id="relicLore"></p><h3>Выберите один протокол</h3><div id="relicBoons"></div></div></section></div>
-<script src="flight-core.js?v=1"></script><script src="game.js?v=29"></script><script src="expedition.js?v=28"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=28"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=28"></script><script src="act.js?v=28"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=28"></script><script src="launch.js?v=23"></script><script src="coop.js?v=29"></script><script src="boot.js?v=23"></script></body></html>
+<script src="flight-core.js?v=1"></script><script src="game.js?v=29"></script><script src="expedition.js?v=28"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=29"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=28"></script><script src="act.js?v=28"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=28"></script><script src="launch.js?v=23"></script><script src="coop.js?v=29"></script><script src="boot.js?v=23"></script></body></html>
