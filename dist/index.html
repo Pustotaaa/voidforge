@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><meta name="description" content="VOIDFORGE — космическая стратегия в 1-bit. Постройте автономный корабль и освободите Чёрный сектор.">
-<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=28"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=1">
+<title>VOIDFORGE — Чёрный сектор</title><link rel="stylesheet" href="style.css?v=21"><link rel="stylesheet" href="campaign.css?v=21"><link rel="stylesheet" href="cockpit.css?v=28"><link rel="stylesheet" href="launch.css?v=27"><link rel="stylesheet" href="coop.css?v=2">
 </head>
 <body id="gameUi">
 <img id="sectorAtlas" src="art/sector-atlas.png" alt="" hidden><img id="lunarBackdrop" src="art/lunar-parallax.png" alt="" hidden>
@@ -105,11 +105,19 @@
       <button id="closeCoop" type="button">Назад</button>
     </header>
     <div class="panelScroll coopLobbyBody">
-      <p>Выйдите в общий сектор и наполните один трюм на весь экипаж.</p>
+      <p>Летайте вместе. Корабль и личный трюм сохраняются в профиле пилота.</p>
       <p id="coopServer" class="coopMuted" role="status"></p>
       <form id="coopForm">
-        <label for="coopName">Позывной</label>
-        <input id="coopName" autocomplete="nickname" maxlength="20" placeholder="Например, Игла">
+        <div id="coopIdentity">
+          <label for="coopName">Позывной</label>
+          <input id="coopName" autocomplete="nickname" maxlength="20" placeholder="Например, Игла">
+          <label for="coopChassis">Стартовый корпус</label>
+          <select id="coopChassis"><option value="wanderer">Скиталец</option><option value="courier">Стриж</option><option value="hauler">Ковчежник</option></select>
+        </div>
+        <div id="coopActiveProfile" hidden>
+          <b id="coopPilotName"></b><button id="coopCopyKey" type="button">Ключ восстановления</button>
+          <button id="coopChangeProfile" type="button">Сменить пилота</button>
+        </div>
         <button id="coopCreate" type="button" class="primary">Создать комнату</button>
         <div class="coopJoin">
           <label for="coopCode">Код комнаты</label>
@@ -118,6 +126,12 @@
         </div>
         <p id="coopLobbyNote" role="status" hidden></p>
       </form>
+      <details id="coopRecovery">
+        <summary>Восстановить профиль</summary>
+        <label for="coopRecoveryKey">Ключ пилота</label>
+        <input id="coopRecoveryKey" type="password" autocomplete="off" maxlength="64">
+        <button id="coopRestore" type="button">Открыть профиль</button>
+      </details>
     </div>
   </section>
 </div>
@@ -133,18 +147,59 @@
     <h2>Экипаж <span id="coopCount"></span></h2>
     <ul id="coopPlayers"></ul>
   </aside>
-  <aside class="coopCargo coopCard" aria-label="Общий трюм">
-    <h2>Общий трюм <span id="coopTotal"></span></h2>
-    <progress id="coopGoal" aria-label="Цель добычи"></progress>
-    <dl><div><dt>Руда</dt><dd id="coopIron">0</dd></div><div><dt>Кристаллы</dt><dd id="coopCrystal">0</dd></div><div><dt>Лёд</dt><dd id="coopIce">0</dd></div></dl>
+  <aside class="coopCargo coopCard" aria-label="Личный трюм">
+    <h2>Трюм <span id="coopHold"></span></h2>
+    <progress id="coopGoal" aria-label="Заполнение личного трюма"></progress>
+    <p id="coopCargoContents"></p>
+    <div class="coopStock">Общий склад <b id="coopTotal"></b></div>
   </aside>
-  <div class="coopDpad" aria-label="Тяга">
-    <button data-coop-dir="ArrowUp" type="button" aria-label="Вверх">↑</button>
-    <button data-coop-dir="ArrowLeft" type="button" aria-label="Влево">←</button>
-    <button data-coop-dir="ArrowDown" type="button" aria-label="Вниз">↓</button>
-    <button data-coop-dir="ArrowRight" type="button" aria-label="Вправо">→</button>
+  <aside class="coopVitals coopCard" aria-label="Состояние корабля">
+    <h2>Корпус <span id="coopHp"></span></h2>
+    <p id="coopStatus"></p>
+    <p id="coopAmmo"></p>
+  </aside>
+  <div class="coopTouch" aria-label="Сенсорное управление">
+    <div id="coopStick" aria-label="Джойстик тяги"><span id="coopStickKnob"></span><small>Тяга</small></div>
+    <button id="coopFire" type="button">Огонь</button>
   </div>
-  <div class="coopControls"><p id="coopNotice" role="status" hidden></p><button id="coopMine" type="button" title="Добыча [E]">Добыча</button><span>WASD или стрелки · Клик по астероиду</span></div>
+  <div class="coopControls"><p id="coopNotice" role="status" hidden></p><div>
+    <button id="coopMine" type="button" title="Добыча [E]">Добыча</button>
+    <button id="coopDash" type="button" title="Рывок [Shift]">Рывок</button>
+    <button id="coopDock" type="button" title="Связь [F]">К порту</button>
+    <button id="coopSystems" type="button" title="Корабль [C]">Корабль</button>
+  </div><span>WASD · Мышь поворачивает корабль · Удерживайте ЛКМ для огня</span></div>
+  <div id="coopServices" class="coopOverlay" role="dialog" aria-labelledby="coopServiceTitle" hidden>
+    <section class="coopServicePanel">
+      <header class="modalHead"><h2 id="coopServiceTitle">Корабль</h2><button id="coopCloseServices" type="button">Закрыть</button></header>
+      <div class="panelScroll">
+        <div class="coopServiceRow"><button id="coopAssist" type="button"></button><button id="coopAutoAim" type="button"></button><button id="coopBoost" type="button"></button></div>
+        <div class="coopServiceRow">
+          <label for="coopPower">Питание</label><select id="coopPower"><option value="balanced">Баланс</option><option value="engines">Двигатели</option><option value="weapons">Оружие</option><option value="shields">Щиты</option></select>
+          <label for="coopGroup">Оружие</label><select id="coopGroup"><option value="all">Всё</option><option value="kinetic">Кинетика</option><option value="energy">Энергия</option><option value="rockets">Ракеты</option></select>
+        </div>
+        <p id="coopDockRequired">Подлетите к станции и снизьте скорость для ремонта и передачи груза.</p>
+        <div id="coopDockServices" hidden>
+          <h3>Склад экипажа</h3>
+          <div class="coopServiceRow"><select id="coopDepositItem" aria-label="Ресурс для передачи"></select><input id="coopDepositAmount" type="number" min="1" max="700" value="1" aria-label="Количество"><button id="coopDeposit" type="button">Передать груз</button></div>
+          <p id="coopStockContents"></p>
+          <h3>Верфь</h3>
+          <div class="coopServiceRow"><button id="coopRepair" type="button">Ремонт</button><button id="coopRearm" type="button">+ Снаряды</button><button id="coopRockets" type="button">+ Ракеты</button></div>
+          <div class="coopServiceRow"><select id="coopModule" aria-label="Модуль"></select><input id="coopModuleX" type="number" min="-6" max="6" value="2" aria-label="Координата X"><input id="coopModuleY" type="number" min="-5" max="5" value="0" aria-label="Координата Y"><button id="coopBuild" type="button">Установить</button><button id="coopUpgrade" type="button">Mk II</button></div>
+          <p id="coopModulesReadout"></p>
+          <h3>Наука</h3>
+          <div class="coopServiceRow"><select id="coopTech" aria-label="Технология"></select><button id="coopResearch" type="button">Изучить</button></div>
+          <p id="coopBalance"></p>
+        </div>
+      </div>
+      <p id="coopServiceFeedback" role="status" hidden></p>
+    </section>
+  </div>
+  <div id="coopDestroyed" class="coopOverlay" role="dialog" aria-labelledby="coopDestroyedTitle" hidden>
+    <section class="coopServicePanel">
+      <h2 id="coopDestroyedTitle">Корабль потерян</h2><p>Груз сохранён. Выберите бесплатную замену.</p>
+      <div class="coopServiceRow"><button id="coopReplaceWanderer" type="button">Скиталец</button><button id="coopReplaceCourier" type="button">Стриж</button><button id="coopReplaceHauler" type="button">Ковчежник</button></div>
+    </section>
+  </div>
 </section>
 <div class="overlay hidden" id="builder" role="dialog" aria-modal="true" aria-labelledby="buildTitle"><section class="buildPanel"><div class="modalHead"><div><div class="eyebrow">ОРБИТАЛЬНАЯ ВЕРФЬ / ВРЕМЯ ОСТАНОВЛЕНО</div><h2 id="buildTitle">Конструктор корабля</h2></div><button id="closeBuild">Готово [B]</button></div><p class="buildIntro">Соединяйте модули с ядром. Разборка купленных модулей возвращает до 50% стоимости.</p><div class="buildToolbar"><button id="removeModule" aria-pressed="false">Установка</button><button id="undoBuild" disabled>Отменить</button><button id="upgradeModule" hidden>Mk II</button><span>СПЛАВ <b id="buildOre"></b></span></div><div class="buildLayout"><div class="buildPalette panelScroll"><div id="parts"></div><details class="trophyBay"><summary>Трофейные модули</summary><div id="spareModules"></div></details></div><div class="editorWrap"><canvas id="editor" width="540" height="440" aria-label="Редактор корабля: выберите клетку для установки модуля"></canvas><div id="buildStatus" role="status"></div></div><div class="buildInfo panelScroll"><h3 id="partName"></h3><p id="partDesc"></p><div id="shipStats"></div></div></div></section></div>
 <div class="overlay hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
@@ -215,4 +270,4 @@
   </section>
 </div>
 <div class="overlay hidden" id="relicModal" role="dialog" aria-modal="true" aria-labelledby="relicTitle"><section class="relicPanel"><div class="modalHead"><div><div class="eyebrow">Восстановленный архив</div><h2 id="relicTitle"></h2></div><button id="relicLater">Позже</button></div><div class="panelScroll"><p id="relicLore"></p><h3>Выберите один протокол</h3><div id="relicBoons"></div></div></section></div>
-<script src="game.js?v=28"></script><script src="expedition.js?v=27"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=21"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=21"></script><script src="act.js?v=21"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=28"></script><script src="launch.js?v=23"></script><script src="coop.js?v=28"></script><script src="boot.js?v=23"></script></body></html>
+<script src="flight-core.js?v=1"></script><script src="game.js?v=29"></script><script src="expedition.js?v=28"></script><script src="navigation.js?v=27"></script><script src="campaign.js?v=28"></script><script src="flight-services.js?v=21"></script><script src="industry.js?v=21"></script><script src="combat.js?v=28"></script><script src="act.js?v=28"></script><script src="sector-art.js?v=23"></script><script src="effects.js?v=21"></script><script src="presentation.js?v=28"></script><script src="launch.js?v=23"></script><script src="coop.js?v=29"></script><script src="boot.js?v=23"></script></body></html>

@@ -57,7 +57,10 @@ function changeResource(key,n){if(key==='ore')s.ore+=n;else s.campaign[key]+=n;}
 const cargoUsed=()=>Object.entries(GOODS).reduce((n,[item,good])=>n+resourceAmount(item)*good.space,0)+s.campaign.spareModules.length*SALVAGE_SPACE;
 const cargoMax=()=>500+count('cargo')*200+(s.campaign.legacyCargo||0);
 const isSafe=p=>PLACES.some(o=>o.kind==='station'&&distance(o,p)<280);
-function shipPhysics(ship=s){let mass=0,cx=0,cy=0,moment=0;for(const m of ship.modules){const w=moduleMass(m);mass+=w;cx+=m.x*w;cy+=m.y*w;}cx/=mass||1;cy/=mass||1;for(const m of ship.modules)moment+=moduleMass(m)*(1+(m.x-cx)**2+(m.y-cy)**2);if(ship===s&&s.campaign)mass+=Object.entries(GOODS).reduce((n,[item,good])=>n+resourceAmount(item)*good.mass,0);const force=1300+activeCount('engine',ship)*5500+activeCount('ion',ship)*10000;const boost=ship===s&&s.campaign.power==='engines'?1.3:1;return {mass,force:force*boost,accel:force*boost/Math.max(1,mass),turn:clamp(5/Math.sqrt(moment/100),.45,4),radius:Math.max(24,...ship.modules.map(m=>Math.hypot(m.x,m.y)*20+12))};}
+function shipPhysics(ship=s){
+ const cargoMass=ship===s&&s.campaign?Object.entries(GOODS).reduce((n,[item,good])=>n+resourceAmount(item)*good.mass,0):0;
+ return FlightCore.shipPhysics(ship,types,cargoMass,ship===s?s.campaign?.power:undefined);
+}
 function defaultNpcs(){return [
  {id:'merchant1',name:'МЕРИДИАН',kind:'merchant',x:-500,y:-300,route:['home','forge','atlas'],leg:1,angle:0,text:'Везу детали между портами. Могу продать запас прямо здесь, но на станциях обычно дешевле.'},
  {id:'merchant2',name:'ПИЛИГРИМ',kind:'merchant',x:800,y:-900,route:['atlas','home','forge'],leg:0,angle:0,text:'Пустой трюм не приносит прибыли. На Атласе готовы переплачивать за детали и металл.'},
@@ -253,54 +256,33 @@ document.querySelectorAll('[data-power]').forEach(b=>b.onclick=()=>{s.campaign.p
 document.querySelectorAll('[data-journal]').forEach(b=>b.onclick=()=>{journalTab=b.dataset.journal;renderJournal();});
 addEventListener('keydown',e=>{if(e.repeat||modal||s.dead)return;if(e.code==='KeyF')$('interact').click();if(e.code==='KeyT')$('research').click();if(e.code==='KeyJ')$('journal').click();if(e.code==='KeyC')$('systems').click();});
 // Force-limited steering, angular inertia, recoil and swept projectile collisions.
-function turnTowards(ship,angle,dt,rate=shipPhysics(ship).turn){let error=Math.atan2(Math.sin(angle-ship.angle),Math.cos(angle-ship.angle));const wanted=clamp(error*5,-rate,rate);ship.angularVelocity=(ship.angularVelocity||0)+clamp(wanted-(ship.angularVelocity||0),-rate*4*dt,rate*4*dt);ship.angle+=ship.angularVelocity*dt;return Math.abs(error);}
-function accelerate(ship,vx,vy,accel,dt){let ax=(vx-ship.vx)*2.4,ay=(vy-ship.vy)*2.4,n=Math.hypot(ax,ay);if(n>accel){ax*=accel/n;ay*=accel/n;}ship.vx+=ax*dt;ship.vy+=ay*dt;}
-function collidePlayer(dt){s.impactCooldown=Math.max(0,(s.impactCooldown||0)-dt);const phys=shipPhysics(),objects=[...s.asteroids.filter(isExtractable),...PLACES.filter(p=>p.kind==='station').map(p=>({...p,r:65}))];for(const a of objects){const dx=s.x-a.x,dy=s.y-a.y,d=Math.hypot(dx,dy),r=a.r+phys.radius*.72;if(d>=r)continue;const nx=dx/(d||1)||1,ny=dy/(d||1),impact=-(s.vx*nx+s.vy*ny);s.x=a.x+nx*(r+1);s.y=a.y+ny*(r+1);if(impact>0){s.vx+=nx*impact*1.3;s.vy+=ny*impact*1.3;s.angularVelocity+=(nx*s.vy-ny*s.vx)*.001;}if(impact>65&&s.impactCooldown<=0){const m=s.modules.slice().sort((u,v)=>distance(position(s,u),a)-distance(position(s,v),a))[0];if(m)hit(s,m,Math.min(50,(impact-55)*.15));s.impactCooldown=.6;if(!s.dead)toast('Столкновение! Снизьте скорость.');}if(s.dead)break;}}
-function turretBearing(origin, target, velocity, speed) {
- const dx=target.x-origin.x, dy=target.y-origin.y;
- const vx=(target.vx||0)-velocity.x, vy=(target.vy||0)-velocity.y;
- const flightTime=Math.hypot(dx,dy)/speed;
- return Math.atan2(dy+vy*flightTime,dx+vx*flightTime);
+function turnTowards(ship,angle,dt,rate=shipPhysics(ship).turn){return FlightCore.turnTowards(ship,angle,dt,rate);}
+const accelerate=FlightCore.accelerate;
+function collidePlayer(dt){
+ const objects=[...s.asteroids.filter(isExtractable),...PLACES.filter(p=>p.kind==='station').map(p=>({...p,r:65}))];
+ FlightCore.collide(s,shipPhysics(),objects,dt,(module,damage)=>{
+  hit(s,module,damage);
+  if(!s.dead)toast('Столкновение! Снизьте скорость.');
+ });
 }
-function leadInCone(ship, muzzle, profile, target, velocity) {
- if(!target||distance(muzzle,target)>profile.speed*profile.life)return null;
- const aim=turretBearing(muzzle,target,velocity,profile.speed);
- return Math.abs(angleDifference(aim,ship.angle-Math.PI/2))<=AIM_HALF_ANGLE+1e-9?aim:null;
-}
+const turretBearing=FlightCore.targetBearing;
+const leadInCone=FlightCore.leadInCone;
 function canTrackTarget(enemy) {
  const target=weaponTarget(enemy),velocity={x:s.vx,y:s.vy};
  return s.modules.some(m=>WEAPONS[m.type]&&operational(m)&&groupAllows(WEAPONS[m.type])&&leadInCone(s,position(s,m),WEAPONS[m.type],target,velocity)!==null);
 }
 function fire(ship,enemy,lock=null) {
- const power=ship===s?s.campaign.power:'balanced';
- const interval={balanced:.32,engines:.40,weapons:.24,shields:.42}[power];
- const velocity={x:ship.vx||0,y:ship.vy||0},mass=shipPhysics(ship).mass;
- let fired=0, firedRail=false;
- for(const m of ship.modules) {
-  const gun=WEAPONS[m.type];
-  if(!gun||!operational(m)||m.cd>0||ship.overheated||ship.energy<gun.energy)continue;
-  if(!enemy&&(!groupAllows(gun)||gun.ammo&&s.campaign[gun.ammo]<gun.rounds))continue;
-  const muzzle=position(ship,m),heading=ship.angle-Math.PI/2;
-  const lead=gun.fixed?null:leadInCone(ship,muzzle,gun,lock,velocity);
-  const angle=lead??heading;
-  const dx=Math.cos(angle),dy=Math.sin(angle),rail=m.type==='rail';
-  const pressure=enemy&&isStory()?(ship.archetype==='scout'?1.52:ship.archetype==='sniper'?1.60:1.48):1;
-  const damage=(enemy?gun.hostileDamage:gun.damage)*(power==='weapons'?1.2:1)*(m.quality==='hot'?1.2:1)*(m.mk===2?1.18:1)*pressure;
-  const guided=gun.kind==='explosive';
-  fireFeedback(muzzle,gun,angle,ship);
-  bullets.push({...muzzle,vx:dx*gun.speed+velocity.x,vy:dy*gun.speed+velocity.y,life:gun.life,enemy,damage,rail,
-    kind:gun.kind,pierce:gun.pierce, guided,targetId:guided&&(enemy?'player':lead!==null?lock.id:null)});
-  if(!enemy&&gun.ammo)s.campaign[gun.ammo]-=gun.rounds;
-  ship.energy-=gun.energy;ship.heat=Math.min(100,ship.heat+gun.heat*(m.quality==='hot'?1.28:1));
-  ship.overheated=ship.heat>=100;m.cd=gun.cooldown??interval;
-  const recoil=gun.recoil/Math.max(1,mass);
-  ship.vx-=dx*recoil;ship.vy-=dy*recoil;
-  fired++;firedRail||=rail;
- }
- if(!enemy&&fired){s.stats.shots+=fired;playSound(firedRail?'rail':'shot');}
- return fired;
+ const pressure=enemy&&isStory()?(ship.archetype==='scout'?1.52:ship.archetype==='sniper'?1.60:1.48):1;
+ const shots=FlightCore.fire(ship,ship===s?s.campaign:ship,WEAPONS,shipPhysics(ship).mass,{
+  enemy,lock,pressure,onShot:(point,gun,angle)=>fireFeedback(point,gun,angle,ship)
+ });
+ bullets.push(...shots);
+ if(!enemy&&shots.length){s.stats.shots+=shots.length;playSound(shots.some(shot=>shot.rail)?'rail':'shot');}
+ return shots.length;
 }
-function updateEnergy(ship,dt,region){const cc=ship===s?s.campaign:ship;ship.energy=Math.min(100,(ship.energy??100)+dt*(7+activeCount('reactor',ship)*11)*(ship===s&&hasTech('capacitors')?1.25:1));let cooling=(5+activeCount('cooler',ship)*9)*(region.id==='ice'?1.5:region.id==='nebula' ? .45 : 1);ship.heat=Math.max(0,(ship.heat||0)-cooling*dt);if(region.id==='storm')ship.energy=Math.max(0,ship.energy-dt*9);if((region.id==='nebula'||region.id==='storm')&&Math.sin(clock*.7)>0.4)ship.heat=Math.min(100,ship.heat+9*dt);if(ship.heat>=100)ship.overheated=true;if(ship.overheated&&ship.heat<=45)ship.overheated=false;for(const m of ship.modules){m.cd=Math.max(0,(m.cd||0)-dt);if(m.disabledFor>0)m.disabledFor=Math.max(0,m.disabledFor-dt);}cc.shieldDelay=Math.max(0,(cc.shieldDelay||0)-dt);const max=activeCount('shield',ship)*90;cc.shield=Math.min(max,cc.shield||0);if(max&&cc.shieldDelay<=0&&region.id!=='nebula'){const amount=Math.min(max-cc.shield,dt*12*(cc.power==='shields'?1.6:cc.power==='weapons'?.5:1),ship.energy*2);cc.shield+=amount;ship.energy-=amount*.5;}}
+function updateEnergy(ship,dt,region){
+ FlightCore.updateEnergy(ship,ship===s?s.campaign:ship,dt,region.id,clock,ship===s&&hasTech('capacitors'));
+}
 function updateEnemies(dt) {
  const engaged=new Set(s.enemies.filter(e=>e.squad&&!e.dead&&distance(s,e)<810).map(e=>e.squad));
  for(const e of s.enemies) {
@@ -362,7 +344,7 @@ function followCourse(phys, maxSpeed, dt) {
   toast('Маршрут перекрыт. Выберите другую точку на карте.');
   return;
  }
- const ax=point.x-s.x,ay=point.y-s.y,range=Math.hypot(ax,ay);
+ const range=distance(s,point);
  if (range<12 && Math.hypot(s.vx,s.vy)<12) {
   s.x=point.x; s.y=point.y; s.vx=s.vy=0;
   flightRoute=null;delete s.destination;
@@ -372,22 +354,10 @@ function followCourse(phys, maxSpeed, dt) {
   } else if(!task)toast('Точка назначения достигнута');
   return;
  }
- const speed=Math.min(maxSpeed,Math.sqrt(2*phys.accel*Math.max(0,range-8))*.7,range*1.7);
- const desired={x:ax/(range||1)*speed,y:ay/(range||1)*speed};
- if (Math.hypot(desired.x,desired.y)>1) turnTowards(s,Math.atan2(desired.y,desired.x)+Math.PI/2,dt,phys.turn);
- accelerate(s,desired.x,desired.y,phys.accel,dt);
+ FlightCore.followPoint(s,point,phys,maxSpeed,dt);
 }
-function applyManualFlight(input, phys, maxSpeed, dt) {
- turnTowards(s,manualHeading(),dt,phys.turn);
- const cos=Math.cos(s.angle), sin=Math.sin(s.angle);
- const dx=input.x*cos-input.y*sin, dy=input.x*sin+input.y*cos;
- if (s.campaign.assist) {
-  accelerate(s, dx*maxSpeed, dy*maxSpeed, phys.accel, dt);
- } else {
-  const drift=Math.exp(-.015*dt);
-  s.vx=(s.vx+dx*phys.accel*dt)*drift;
-  s.vy=(s.vy+dy*phys.accel*dt)*drift;
- }
+function applyManualFlight(input,phys,maxSpeed,dt) {
+ FlightCore.applyManualFlight(s,input,manualHeading(),s.campaign.assist,phys,maxSpeed,dt);
 }
 function update(dt) {
  clock+=dt;
@@ -426,7 +396,7 @@ function update(dt) {
    s.braking=false;
   }
  }
- const maxSpeed=cruiseLimit(dt,manual,clamp(150+phys.accel*.65,170,320));
+ const maxSpeed=cruiseLimit(dt,manual,FlightCore.speedLimit(phys));
  if (s.destination) followCourse(phys,maxSpeed,dt);
  else if (s.braking) {
   accelerate(s,0,0,phys.accel*1.4,dt);
@@ -439,11 +409,7 @@ function update(dt) {
   s.vx+=(region.x-s.x)/r*9*dt; s.vy+=(region.y-s.y)/r*9*dt;
  }
  updateDash(dt);
- const velocity=Math.hypot(s.vx,s.vy);
- if (velocity>650) { s.vx*=650/velocity; s.vy*=650/velocity; }
- s.x+=s.vx*dt; s.y+=s.vy*dt;
- if (Math.abs(s.x)>LIMIT) {s.x=clamp(s.x,-LIMIT,LIMIT);s.vx*=-.25;}
- if (Math.abs(s.y)>LIMIT) {s.y=clamp(s.y,-LIMIT,LIMIT);s.vy*=-.25;}
+ FlightCore.integrate(s,dt);
  updateTargetedFire();
  targetLock=autoAim?nearestTarget(true):null;
  targetInRange=Boolean(targetLock||autoAim&&nearestTarget());

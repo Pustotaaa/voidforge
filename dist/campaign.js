@@ -3,7 +3,6 @@
 const BOSS_ID = 'watcher';
 const GUARD_IDS = ['pirate-0', 'pirate-1', 'pirate-2'];
 const BOSS_HOME = {x:2290,y:340};
-const ENERGY_PER_PULSE = {surface: 4, deep: 9, wreck: 6};
 const ENEMY_INFO = {
  scout:{rank:'Разведчик',tier:1,tactic:'Быстрый, держится сбоку. Сбейте двигатель, пока он не ушёл.',range:320,speed:116,cool:1.55,attack:520},
  skirmisher:{rank:'Налётчик',tier:2,tactic:'Обходит по дуге и стреляет на сближении. Держите дистанцию.',range:300,speed:92,cool:1.05,attack:650},
@@ -145,8 +144,9 @@ function runExtraction(a,manual=false) {
  const profile=rockProfile(a),space=freeFor(profile.item);
  if(space<=0&&isExtractable(a)) {cancelPilot();toast('Трюм заполнен. Остаток лута сохранился в обломках.');return false;}
  const layer=miningLayer(a), boost=s.campaign.miningMode==='boost';
- const energy=ENERGY_PER_PULSE[layer]*(boost?2:1)+(manual?2:0);
- const heat=(layer==='deep'?15:layer==='wreck'?9:5)*(boost?2:1)+(manual?5:0);
+ const {energy,heat,amount:n,cooldown}=FlightCore.miningPulse(a,profile,layer,{
+  boost,manual,rigs:activeCount('drill'),geology:hasTech('geology'),story:isStory(),space
+ });
  if(profile.unstable&&(manual||boost)&&s.energy>=energy&&s.heat+heat>=95&&breakDeposit(a,true)) {
   s.heat=Math.min(100,s.heat+heat);s.energy-=energy;save(false);return true;
  }
@@ -155,11 +155,6 @@ function runExtraction(a,manual=false) {
   return false;
  }
  delete s.miningWait;
- const rigs=activeCount('drill');
- const speed=(hasTech('geology')?11:7)+Math.min(rigs,3)*2;
- const limit=layer==='surface'&&a.work?a.work.surface:a.ore;
- const hardness=layer==='deep'?(a.work.tier===2 ? .55 : .72):1;
- const n=Math.min(a.ore,limit,space,Math.max(1,Math.floor(speed*(boost?1.6:1)*(manual?1.18:1)*hardness/profile.hardness)));
  if(n<=0) {
   if(a.loot&&(space<10||a.loot.module&&space<SALVAGE_SPACE)) {cancelPilot();toast(a.loot.module?'Для трофея нужно 12 свободных мест.':'Для каждой детали нужно 10 свободных мест.');}
   return false;
@@ -172,7 +167,7 @@ function runExtraction(a,manual=false) {
  if(a.material==='salvage'&&!a.loot)s.campaign.data+=Math.max(1,Math.floor(n/6));
  if(layer==='deep'&&a.material==='crystal')s.campaign.data+=Math.floor(n/5);
  playSound('mine');
- mining=(boost ? .53 : layer==='deep' ? 1.05 : .8)*(manual ? .62 : 1)*(isStory()&&!hasTech('geology')?2:1);
+ mining=cooldown;
  fx.push({...spot,t:.34,mine:true});
  rockImpact(a,spot,!a.wreck&&a.ore===0);
  if(manual&&a.r>=36&&a.id.startsWith('industry-')&&layer==='deep'&&a.ore>0&&a.ore<=24&&breakDeposit(a))return true;

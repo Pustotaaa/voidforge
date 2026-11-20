@@ -3,8 +3,8 @@ const $ = id => document.getElementById(id);
 const c = $('space'), ctx = c.getContext('2d'), mini = $('map').getContext('2d');
 const editor = $('editor'), ec = editor.getContext('2d');
 const sectorCanvas = $('sectorMap'), sg = sectorCanvas.getContext('2d');
-const STORAGE = 'voidforge-v1', DOCK_STORAGE = 'voidforge-dock-v1', SAVE_VERSION = 10, LIMIT = 2700, MINE_RANGE = 240, AIM_RANGE = 700;
-const AIM_HALF_ANGLE=35*Math.PI/180, SIM_STEP=1/60;
+const STORAGE = 'voidforge-v1', DOCK_STORAGE = 'voidforge-dock-v1', SAVE_VERSION = 10, LIMIT = FlightCore.LIMIT, MINE_RANGE = FlightCore.MINE_RANGE, AIM_RANGE = 700;
+const AIM_HALF_ANGLE=FlightCore.AIM_HALF_ANGLE, SIM_STEP=FlightCore.STEP;
 const angleDifference=(angle,heading)=>Math.atan2(Math.sin(angle-heading),Math.cos(angle-heading));
 const types = {
   armor: {name:'Броня', cost:15, hp:160, symbol:'▧', desc:'160 прочности. Защищает внутренние модули. Любой дополнительный модуль увеличивает массу.'},
@@ -20,7 +20,7 @@ const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 const count = (type,ship=s) => ship.modules.filter(m=>m.type===type&&m.hp>0).length;
 const capacity = ship => ship.modules.reduce((n,m)=>n+moduleMaxHp(m),0);
 const core = ship => ship.modules.find(m=>m.x===0&&m.y===0);
-const position = (ship,m) => ({x:ship.x+(m.x*Math.cos(ship.angle)-m.y*Math.sin(ship.angle))*20,y:ship.y+(m.x*Math.sin(ship.angle)+m.y*Math.cos(ship.angle))*20});
+const position = FlightCore.position;
 let s, W=0,H=0,clock=0,last=null,frameDebt=0,mining=0,paused=false,modal=null,selected='armor',removeMode=false;
 let sharedFlight=null;
 let bullets=[],fx=[],keys={},logs=[],buildHistory=[],hoverCell=null,toastTimer,dockSave=null,saveBlocked=false;
@@ -186,7 +186,7 @@ function nearestTarget(inSector=false) {
 }
 function setAutoAim(value){autoAim=value;$('autoAim').textContent='⌖ Автоприцел ±35°: '+(value?'вкл':'выкл');$('autoAim').setAttribute('aria-pressed',String(value));try{localStorage.setItem('voidforge-autoaim',String(value));}catch{}}
 function connected(ms){return ms.length>0&&remainingConnected(ms).length===ms.length;}
-function remainingConnected(ms){const root=ms.find(m=>m.x===0&&m.y===0);if(!root)return [];const found=new Set([root]);for(let i=0;i<ms.length;i++)for(const m of ms)if([...found].some(n=>Math.abs(m.x-n.x)+Math.abs(m.y-n.y)===1))found.add(m);return ms.filter(m=>found.has(m));}
+const remainingConnected=FlightCore.remainingConnected;
 function snapshotBuild(){buildHistory.push({modules:JSON.parse(JSON.stringify(s.modules)),ore:s.ore,credits:s.campaign.credits,spent:{...actState().spent},trophyFitted:actState().trophyFitted,hullCapacity:s.hullCapacity,lostModules:s.lostModules.slice(),spareModules:s.campaign.spareModules.slice(),selectedSalvage});if(buildHistory.length>30)buildHistory.shift();}
 function editAt(x,y,remove=removeMode){if(Math.abs(x)>6||Math.abs(y)>5||types[selected].npcOnly)return;const trophy=selectedTrophy();if(!remove&&!trophy&&types[selected].tech&&!hasTech(types[selected].tech)){toast('Сначала исследуйте технологию в разделе «Наука»');return;}const old=s.modules.find(m=>m.x===x&&m.y===y);let message;
  if(remove){if(!old)return;if(x===0&&y===0){toast('Центральное ядро нельзя разобрать');return;}const rest=s.modules.filter(m=>m!==old);if(!connected(rest)){toast('Этот модуль соединяет части корабля');return;}snapshotBuild();const refund=old.issued?0:Math.floor(types[old.type].cost*.5*old.hp/moduleMaxHp(old));s.modules=rest;s.ore+=refund;s.hullCapacity=Math.max(capacity(s),s.hullCapacity-moduleMaxHp(old));message='Разобрано: '+types[old.type].name+(old.issued?' · выданный модуль':' · +'+refund+' сплава');}
@@ -212,12 +212,10 @@ function hit(ship, module, damage, kind) {
   return;
  }
  const shield=ship===s?s.campaign:ship;
- shield.shieldDelay=3;
  const profile=DAMAGE_TYPES[kind];
- if(activeCount('shield',ship)>0&&shield.shield>0) {
-  const rate=profile?.shield??1,absorbed=Math.min(shield.shield,damage*rate);
-  shield.shield-=absorbed;damage-=absorbed/rate;shieldFeedback(ship,point,absorbed);
- }
+ const shieldResult=FlightCore.shieldHit(ship,shield,damage,profile);
+ damage=shieldResult.damage;
+ if(shieldResult.absorbed)shieldFeedback(ship,point,shieldResult.absorbed);
  if(actProtects(ship,module))damage=0;
  if(module.type==='armor')damage*=profile?.armor??1;
  fx.push({...point,t:.25});
@@ -292,7 +290,7 @@ function updateWorldCursor(e) {
  c.classList.toggle('world-action',Boolean(actionable));
 }
 c.onpointerdown = e => {
- if (sharedFlight?.active()) { sharedFlight.selectAsteroid(e); return; }
+ if (sharedFlight?.active()) { sharedFlight.pointerDown(e); return; }
  if (modal || s.dead || worldPointer || e.button === 2) return;
  e.preventDefault();
  if(manualMiningTarget()) {
@@ -315,6 +313,7 @@ c.onpointerdown = e => {
  c.setPointerCapture(e.pointerId);
 };
 c.onpointermove = e => {
+ if(sharedFlight?.active()){sharedFlight.pointerMove(e);return;}
  if (modal || s.dead) return;
  if(beamPointer?.id===e.pointerId) {beamPointer.x=e.clientX;beamPointer.y=e.clientY;c.classList.remove('world-action');return;}
  if (e.pointerType === 'mouse' || e.pointerType === undefined) {
@@ -332,6 +331,7 @@ c.onpointermove = e => {
  touchHeading=Math.atan2(dy,dx)+Math.PI/2;
 };
 c.onpointerup = e => {
+ if(sharedFlight?.active()){sharedFlight.pointerUp(e);return;}
  const start=worldPointer;
  if (!start || start.id !== e.pointerId) return;
  worldPointer=null; mouse.down=false;
@@ -342,6 +342,7 @@ c.onpointerup = e => {
  else if (start.asteroid) startMining(start.asteroid);
 };
 c.onpointercancel = c.onlostpointercapture = e => {
+ if(sharedFlight?.active()){sharedFlight.pointerUp(e,true);return;}
  if (worldPointer?.id === e.pointerId) { worldPointer=null; mouse.down=false;if(beamPointer?.id===e.pointerId)beamPointer=null; }
 };
 c.oncontextmenu=e=>e.preventDefault();
