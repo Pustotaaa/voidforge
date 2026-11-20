@@ -114,7 +114,7 @@ async function enterRoom(db,id,code,creating) {
   const savePilot=query(db,'UPDATE pilot_profiles SET room_code=?,lease=?,revision=revision+1 WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM flight_rooms WHERE code=? AND write_id=?)',
    roomCode,lease,id,profile.revision,roomCode,writeId);
   const [written,assigned]=await db.batch([saveRoom,savePilot]);
-  if (written.meta.changes===1 && assigned.meta.changes===1) return payload(view(roomCode,player,world,now),isNew?201:200);
+  if (written.meta.changes>0 && assigned.meta.changes>0) return payload(view(roomCode,player,world,now),isNew?201:200);
  }
  reject(503,'Комната обновляется. Попробуйте ещё раз.');
 }
@@ -292,7 +292,8 @@ async function syncRoom(db,id,code,input,leaving) {
   if (leaving) batch.push(query(db,'UPDATE pilot_profiles SET ship=?,room_code=NULL,lease=NULL,revision=revision+1 WHERE id=? AND room_code=? AND lease=? AND EXISTS (SELECT 1 FROM flight_rooms WHERE code=? AND write_id=?)',
    JSON.stringify(player.ship),id,code,input.lease,code,writeId));
   const [written]=await db.batch(batch);
-  if (written.meta.changes===1) return payload(leaving?{left:true}:view(code,player,world,now));
+  // Profile updates from the trigger may also count as changed rows in D1.
+  if (written.meta.changes>0) return payload(leaving?{left:true}:view(code,player,world,now));
  }
  reject(503,'Комната обновляется. Повторяем запрос.');
 }
